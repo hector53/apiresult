@@ -6,7 +6,7 @@ datos = {
     "userDb" : "nacho",
     "userPass":"nacho*123",
 }
-url_site = "apiresult.jemyxs2xli-zqy3jz1yy6kg.p.runcloud.link"
+url_site = "http://apiresult.jemyxs2xli-zqy3jz1yy6kg.p.runcloud.link/"
 
 
 
