@@ -7,6 +7,8 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 import qrcode
 import time
 import math
+import string    
+import random
 
 
 def time_passed(fecha):
@@ -117,8 +119,8 @@ def create_poll_not_user():
 
 
     sql = f"""
-    INSERT INTO mn_eventos ( titulo, descripcion, codigo, id_user, status, fecha) VALUES ( '{pregunta}',
-    '', '{miCodigo}', '{cookieNotUser}', 1,  '{datetime.now()}'  ) 
+    INSERT INTO mn_eventos ( titulo, descripcion, codigo, id_user, modo, tipoUser, status, fecha) VALUES ( '{pregunta}',
+    '', '{miCodigo}', '{cookieNotUser}', 0, 0, 1,  '{datetime.now()}'  ) 
     """ 
     id_evento = updateData(sql)
     sql = f"""
@@ -203,8 +205,14 @@ def registrar_user():
 
                 access_token = create_access_token(identity=id_user)
 
+                sql = f"SELECT * FROM mn_users where id = '{id_user}' " 
+                getUser = getDataOne(sql)
+
                 
                 response={
+                        "name": getUser[1]+' '+getUser[2],
+                        "email": getUser[3], 
+                        "username": getUser[4], 
                         "status": id_user, 
                         "token": access_token
                 }
@@ -237,7 +245,7 @@ def events_not_registered():
                     'id': row[0],
                     'titulo': row[1],
                     'codigo': row[3],
-                    'fecha':   time_passed(str(row[6])),
+                    'fecha':   time_passed(str(row[8])),
                     'cantVoto': cantVotoO[0][0]
                     })
 
@@ -337,7 +345,7 @@ def get_encuesta_not_registered():
                         'miVoto': miVoto, 
                         "qr": url_site+'static/img/qr/QR_'+codigo+'.png', 
                         "id_evento": idEvento, 
-                        "fecha": time_passed(str(encuesta[5]))
+                        "fecha": time_passed(str(evento[8]))
                         }
 
                         
@@ -354,13 +362,19 @@ def votar_encuesta():
         id_encuesta = body["id_encuesta"]
         cookieNotUser = body["cookieNotUser"]
         id_evento = body["id_evento"]
+        login = body["login"]
         miUid = cookieNotUser
-        sql = f"SELECT * FROM mn_users where cookieUser = '{miUid}' " 
-        getUser = getDataOne(sql)
-        if getUser:
-                return jsonify(result = 0) 
+        if login:
+                status =1
         else:
-                status = 1
+                sql = f"SELECT * FROM mn_users where cookieUser = '{miUid}' " 
+                getUser = getDataOne(sql)
+                if getUser:
+                        return jsonify(result = 0) 
+                else:
+                        status = 1
+
+        
 
         #buscar si el usuario ya voto en esta encuesta 
         sql2 = f"SELECT * FROM mn_votos_choice where id_tipo_encuesta = {id_encuesta} and id_user = '{miUid}'    " 
@@ -396,3 +410,507 @@ def cancelar_voto():
         }
         socketio.emit('respuestaDelVoto', 'votaste')
         return jsonify(response) 
+
+
+
+#user registered
+
+@app.route('/api/events_user_registered' , methods=['GET'])
+@jwt_required()
+def events_user_registered():
+    id_user = get_jwt_identity()
+    sqlV = f"SELECT COUNT(*) FROM `mn_votos_choice` WHERE id_user = '{id_user}' " 
+    cantVotos = getData(sqlV)
+    sql = f"SELECT * FROM mn_eventos where id_user = '{id_user}' order by id desc " 
+    #buscar por uid las encuestas q tenga en la db 
+    evento = getData(sql)
+
+    data = []
+    if evento:
+            for row in evento:
+                    idEvento=row[0]
+                    #buscar cantidad de votos 
+                    sqlVO = f"SELECT COUNT(*) FROM `mn_votos_choice` WHERE  id_evento = '{idEvento}' " 
+                    cantVotoO = getData(sqlVO)
+                    
+                    data.append({
+                    'id': row[0],
+                    'titulo': row[1],
+                    'codigo': row[3],
+                    'fecha':   time_passed(str(row[8])),
+                    'cantVoto': cantVotoO[0][0]
+                    })
+
+            response = {
+            'eventos': data,
+            'cantVotos': cantVotos[0][0],
+            'cantEventos': len(evento),
+            'status': 1,
+            }
+
+    else:
+            response = {
+            'status': 0,
+            }
+
+    return jsonify(response)
+
+#funcion codigo aleatorio 
+def codigoAleatorio(s):
+        ran = ''.join(random.choices(string.ascii_uppercase + string.digits, k = s))    
+        return str(ran)
+#
+
+
+@app.route('/api/crear_evento' , methods=["POST"])
+@jwt_required()
+def crear_evento():  
+        body = request.get_json()
+        titulo = body["titulo"]
+        descripcion = body["descripcion"]
+        id_user = get_jwt_identity()
+        codigo = codigoAleatorio(5)
+        
+        if titulo:
+                sql = f"""
+                INSERT INTO mn_eventos ( titulo, descripcion, codigo, id_user, modo, tipoUser,  status, fecha) 
+                VALUES 
+                ( '{titulo}', '{descripcion}', '{codigo}', '{id_user}', 0, 1, 0, '{datetime.now()}'  ) 
+                """ 
+                id_evento = updateData(sql)
+
+                response = {
+                        "status": id_evento, 
+                        "codigo": codigo
+                }
+        else:
+                response = {
+                        "status": 0
+                }
+
+
+        return jsonify(response)
+
+
+
+
+
+@app.route('/api/guardar_pregunta_tipo_1' , methods=["POST"])
+@jwt_required()
+def guardar_pregunta_tipo_1():  
+        print("llegue aqui")
+        body = request.get_json()
+        id = body["id"]
+        pregunta = body["pregunta"]
+        id_user = get_jwt_identity()
+        codigo = body["codigo"]
+        #buscar id del evento por le codigo 
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}' " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        if evento: 
+                print("si existe el evento")
+                id_evento = evento[0]
+        else: 
+                print("no existe el evento pailas lo voto")
+                response = {
+                        "status": 0
+                }
+                return jsonify(response)
+
+        if id == 0:
+                print("es nueva la creo")
+                sql = f"""
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, id_user, id_evento, fecha) 
+                VALUES 
+                ( 1, '{pregunta}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                """ 
+                id_tipo = updateData(sql)
+                response = {
+                        "status": id_tipo, 
+                        "id": id_tipo
+                }
+        else:
+                print("es vieja la actualizo")
+                sql = f"""
+                update mn_tipo_encuesta set titulo = '{pregunta}', fecha = '{datetime.now()}' where 
+                id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id}'
+                """ 
+                id_tipo = updateData(sql)
+                response = {
+                        "status": 1, 
+                        "id": id
+                }
+        
+        return jsonify(response)
+
+@app.route('/api/guardar_opciones_tipo_1' , methods=["POST"])
+@jwt_required()
+def guardar_opciones_tipo_1():  
+        print("llegue aqui")
+        body = request.get_json()
+        id = body["id"]
+        id_user = get_jwt_identity()
+        codigo = body["codigo"]
+        pregunta = body["pregunta"]
+        opciones = body["opciones"]
+        #buscar id del evento por le codigo 
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}' " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        if evento: 
+                print("si existe el evento")
+                id_evento = evento[0]
+        else: 
+                print("no existe el evento pailas lo voto")
+                response = {
+                        "status": 0
+                }
+                return jsonify(response)
+
+        if id == 0:
+                print("es nueva la creo")
+                #consultar la posicion 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+                #buscar por uid las encuestas q tenga en la db 
+                enPosicion = getData(sql)
+                posicion = len(enPosicion) + 1
+
+                sql = f"""
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion, id_user, id_evento, fecha) 
+                VALUES 
+                ( 1, '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                """ 
+                id_tipo = updateData(sql)
+                #ahora aqui si creo las opciones 
+                for opcion in opciones:
+                        opcionValue = opcion["opcion"]
+                        sql = f"""
+                        INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{opcionValue}',
+                        '{id_tipo}' ) 
+                        """ 
+                        actualizar = updateData(sql)
+                
+                #cargar opciones 
+                sqlOp = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = '{id_tipo}' " 
+                #buscar por uid las encuestas q tenga en la db 
+                opcionesDb = getData(sqlOp)
+                opcionesData = []
+                for op in opcionesDb:
+                        opcionesData.append({
+                        'id': op[0],
+                        'opcion': op[1],
+                        })
+                
+                response = {
+                        "status": id_tipo, 
+                        "id": id_tipo, 
+                        "opciones": opcionesData
+                }
+        else:
+                print("es vieja la actualizo")
+                sql = f"""
+                update mn_tipo_encuesta set titulo = '{pregunta}', fecha = '{datetime.now()}' where 
+                id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id}'
+                """ 
+                id_tipo = updateData(sql)
+                #comprar la opcion si no existe la creo, y si existe la actualizo
+                for opcion in opciones:
+                        opcionValue = opcion["opcion"]
+                        idOpcion = opcion["id"]
+                        if idOpcion==0:
+                                print("creo la opcion")
+                                sql = f"""
+                                INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{opcionValue}',
+                                '{id}' ) 
+                                """  
+                                crearOpcion = updateData(sql)
+                        else:
+                                print("actualizo la opcion")
+                                sql = f"""
+                                update mn_tipo_encuesta_choice set opcion = '{opcionValue}' where 
+                                id = '{idOpcion}'
+                                """ 
+                                id_tipo = updateData(sql)
+
+                
+                #cargar opciones 
+                sqlOp = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = '{id}' " 
+                #buscar por uid las encuestas q tenga en la db 
+                opcionesDb = getData(sqlOp)
+                opcionesData = []
+                for op in opcionesDb:
+                        opcionesData.append({
+                        'id': op[0],
+                        'opcion': op[1],
+                        })
+                response = {
+                        "status": 1, 
+                        "id": id, 
+                        "opciones": opcionesData
+                }
+        
+        return jsonify(response)
+
+
+@app.route('/api/get_encuestas_event' , methods=['GET'])
+@jwt_required()
+def get_encuestas_event():
+        id_user = get_jwt_identity()
+        codigo = request.args.get('codigo', '')
+        sql = f"SELECT * FROM mn_eventos where id_user = '{id_user}' and codigo = '{codigo}'  " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        if evento: 
+                print("existe el evento")
+                id_evento = evento[0]
+                nameEvent = evento[1]
+                eventStatus = evento[7]
+                print(nameEvent)
+        else: 
+                print("no existe el evento ")
+                response = {
+                        "status": 0
+                }
+                return jsonify(response)
+
+        #ahora listo las encuestas con sus respectivas opciones 
+        sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+        #buscar por uid las encuestas q tenga en la db 
+        encuestas = getData(sql)
+        if encuestas:
+                print("si tiene")
+                print(encuestas)
+                encuestaTipo = []
+                for en in encuestas:
+                        idEcuesta = en[0]
+                        tipo = en[1]
+                        pregunta = en[2]
+                        #ahora busco las opciones 
+                        #cargar opciones 
+                        sqlOp = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = '{idEcuesta}' " 
+                        #buscar por uid las encuestas q tenga en la db 
+                        opcionesDb = getData(sqlOp)
+                        print("voy por opciones", opcionesDb)
+                        opcionesData = []
+                        for op in opcionesDb:
+                                opcionesData.append({
+                                'id': op[0],
+                                'opcion': op[1],
+                                })
+
+                        print("ya guarde las opciones")
+                        #agregar al array encuestas
+                        if tipo == 1:
+                                print("es tipo 1")
+                                encuestaTipo.append( {
+                                 'tipo': tipo, 
+                                'idEcuesta': idEcuesta,
+                                'pregunta': pregunta, 
+                                'opciones': opcionesData,
+                                'opciones2': opcionesData
+                                })
+                                print("ua guarte tipo 1", encuestaTipo)
+                print(nameEvent)
+                response = {
+                        "status": 1, 
+                        "misencuestas": encuestaTipo, 
+                        "eventName": nameEvent, 
+                        "eventStatus": eventStatus
+                }
+
+                return jsonify(response)
+                        
+        else:
+                print("no tiene")
+                response = {
+                        "status": 0, 
+                        "eventName": nameEvent, 
+                        "eventStatus": eventStatus
+                }
+                return jsonify(response)
+
+
+@app.route('/api/mover_arriba_posicion_encuesta' , methods=["POST"])
+@jwt_required()
+def mover_arriba_posicion_encuesta():  
+        print("llegue aqui")
+        body = request.get_json()
+        idEncuestaVieja = body["idEncuestaVieja"]
+        idEncuestaNueva = body["idEncuestaNueva"]
+        posicionVieja = body["posicionVieja"]
+        posicionNueva = body["posicionNueva"]
+
+        id_user = get_jwt_identity()
+        
+        sql = f"""
+        update mn_tipo_encuesta set posicion = '{posicionNueva}' where 
+        id = '{idEncuestaVieja}' and id_user = '{id_user}'
+        """ 
+        id_tipo = updateData(sql)
+
+        sql = f"""
+        update mn_tipo_encuesta set posicion = '{posicionVieja}' where 
+        id = '{idEncuestaNueva}' and id_user = '{id_user}'
+        """ 
+        id_tipo = updateData(sql)
+
+        response = {
+        "status": 1, 
+        }
+        
+        return jsonify(response)
+
+#get encuesta by codigo event
+
+@app.route('/api/get_event_by_cod_front' , methods=["GET"])
+def get_event_by_cod_front():
+        codigo = request.args.get('codigo', '')
+        print(codigo)
+        codigo = codigo[0:5]
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}'  " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+                #listar las encuestas para enviarlas de una vez 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' order by posicion asc  " 
+                #buscar por uid las encuestas q tenga en la db 
+                encuestas = getData(sql)
+                if encuestas:
+                        encuestaTipo = []
+                        for en in encuestas:
+                                encuestaTipo.append( {
+                                'id': en[0], 
+                                'tipo': en[1],
+                                'titulo': en[2], 
+                                'posicion': en[3],
+                                })
+                        response = {
+                        "status": 1, 
+                        "id_evento":  evento[0], 
+                        "tipoUser": evento[6],
+                        "statusEvent": evento[7],
+                        "encuestas": encuestaTipo
+                        }
+                else: 
+                        response = {
+                        "status": 1, 
+                        "id_evento":  evento[0], 
+                        "tipoUser": evento[6],
+                        "statusEvent": evento[7],
+                        "encuestas": encuestaTipo
+                        }
+               
+        else:
+                response = {
+                        "status": 0, 
+                }
+
+        return jsonify(response) 
+
+
+@app.route('/api/get_encuesta_by_id' , methods=["GET"])
+def get_encuesta_by_id():
+        idEncuesta = request.args.get('id_encuesta', '')
+        p = request.args.get('p', '')
+        sql2 = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = {idEncuesta}  " 
+        print(sql2)
+        opciones = getData(sql2)
+        data = []
+        if opciones:
+                #buscar votos 
+                sql3 = f"SELECT * FROM mn_votos_choice where id_tipo_encuesta = {idEncuesta}  " 
+                print(sql3)
+                votos = getData(sql3)
+                totalVotos = len(votos)
+                descripcionMeta = ''
+                i = 0
+                for row in opciones:
+                        #sacar porcentaje 
+                        id_opcion = row[0]
+                        sql4 = f"SELECT * FROM mn_votos_choice where id_tipo_encuesta = {idEncuesta} and id_opcion = {id_opcion}  "
+                        print(sql4) 
+                        voto_opcion = getData(sql4)
+                        if voto_opcion:
+                                total_voto_opcion = len(voto_opcion)
+                                porcentaje = (total_voto_opcion * 100) / totalVotos
+                                color = i
+                        else:
+                                porcentaje = 0
+                                total_voto_opcion = 0
+                                color = 10
+                        if i==0:
+                                descripcionMeta = descripcionMeta + str((i+1))+')'+row[1]
+                        else:
+                                descripcionMeta = descripcionMeta + ', '+str((i+1))+')'+row[1]
+                        
+                        data.append({
+                        'id': row[0],
+                        'valor': row[1],
+                        'porcentaje':   "{:.2f}".format(float(porcentaje)),
+                        'totalVoto': total_voto_opcion, 
+                        'color': color
+                        })
+
+                        #buscar por uid si vote en la encuesta
+                        miUid = p
+                        sql3 = f"SELECT * FROM mn_votos_choice where id_user = '{miUid}' and id_tipo_encuesta = '{idEncuesta}'  " 
+                        print(sql3)
+                        voto = getDataOne(sql3)
+                        
+                        if voto:
+                                siVote = 1
+                                miVoto= voto[1]
+                        else:
+                                siVote = 0
+                                miVoto= 0
+                        
+                        i=i+1
+
+                response = {
+                'status':1,
+                'totalVotos': totalVotos,
+                'opciones': data,
+                'siVote': siVote, 
+                'meta':descripcionMeta, 
+                'miVoto': miVoto, 
+                }
+        else:
+                response = {
+                'status': 0
+                }
+
+       
+        return jsonify(response) 
+                
+
+
+#publicar evento 
+
+
+@app.route('/api/publicar_evento' , methods=["POST"])
+@jwt_required()
+def publicar_evento():  
+        body = request.get_json()
+        publicarDesactivar = body["publicarDesactivar"]
+        print(publicarDesactivar)
+        if publicarDesactivar == 1:
+                status = 0
+        else:
+                status = 1
+
+        id_user = get_jwt_identity()
+        codigo = body["codigo"]
+        sql = f"""
+        update mn_eventos set status = '{status}' where 
+        codigo = '{codigo}' and id_user = '{id_user}'
+        """ 
+        evento = updateData(sql)
+
+        response = {
+                'status': 1
+                }
+        return jsonify(response) 
+
+        
