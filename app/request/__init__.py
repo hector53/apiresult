@@ -4,6 +4,7 @@ from app import socketio
 from app.schemas import *
 from datetime import datetime, timedelta
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_socketio import join_room, leave_room
 import qrcode
 import time
 import math
@@ -392,7 +393,7 @@ def votar_encuesta():
                 """ 
                 actualizar = updateData(sql)
                 if actualizar:
-                        #socketio.emit('respuestaDelVoto', 'votaste')
+                        socketio.emit('respuestaDelVoto', { "tipo": 1, "msj": "votaste", "id_encuesta": id_encuesta})
                         return jsonify(result = status) 
                 else:
                         return jsonify(result = 3) 
@@ -408,7 +409,7 @@ def cancelar_voto():
         response = {
         'status': actualizar,
         }
-        socketio.emit('respuestaDelVoto', 'votaste')
+        socketio.emit('respuestaDelVoto', {"tipo": 2, "msj": "cancelo el voto", "id_encuesta": int(id_encuesta)})
         return jsonify(response) 
 
 
@@ -777,8 +778,9 @@ def get_event_by_cod_front():
                 sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' order by posicion asc  " 
                 #buscar por uid las encuestas q tenga en la db 
                 encuestas = getData(sql)
+                encuestaTipo = []
                 if encuestas:
-                        encuestaTipo = []
+                        
                         for en in encuestas:
                                 encuestaTipo.append( {
                                 'id': en[0], 
@@ -913,4 +915,104 @@ def publicar_evento():
                 }
         return jsonify(response) 
 
-        
+
+
+@app.route('/api/get_event_by_cod' , methods=["GET"])
+@jwt_required()
+def get_event_by_cod():
+        print("get event ")
+        id_user = get_jwt_identity()
+        codigo = request.args.get('codigo', '')
+        print(codigo)
+        codigo = codigo[0:5]
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' order by posicion asc  " 
+                #buscar por uid las encuestas q tenga en la db 
+                encuestas = getData(sql)
+                encuestaTipo = []
+                if encuestas:
+                        for en in encuestas:
+                                encuestaTipo.append( {
+                                'id': en[0], 
+                                'tipo': en[1],
+                                'titulo': en[2], 
+                                'posicion': en[3],
+                                })
+                response = {
+                "status": 1, 
+                "id":  evento[0], 
+                "titulo": evento[1],
+                "statusEvent": evento[7],
+                "tipoEncuesta": encuestaTipo
+                }
+        else:
+                response={
+                        "status": 0
+                }
+
+        return jsonify(response) 
+
+
+
+@app.route('/api/get_encuesta_by_id_result' , methods=["GET"])
+def get_encuesta_by_id_result():
+        idEncuesta = request.args.get('id_encuesta', '')
+        sql2 = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = {idEncuesta}  " 
+        opciones = getData(sql2)
+        data = []
+        if opciones:
+                #buscar votos 
+                sql3 = f"SELECT * FROM mn_votos_choice where id_tipo_encuesta = {idEncuesta}  " 
+                votos = getData(sql3)
+                totalVotos = len(votos)
+                i = 0
+                for row in opciones:
+                        #sacar porcentaje 
+                        id_opcion = row[0]
+                        sql4 = f"SELECT * FROM mn_votos_choice where id_tipo_encuesta = {idEncuesta} and id_opcion = {id_opcion}  "
+                        voto_opcion = getData(sql4)
+                        if voto_opcion:
+                                total_voto_opcion = len(voto_opcion)
+                                porcentaje = (total_voto_opcion * 100) / totalVotos
+                                color = i
+                        else:
+                                porcentaje = 0
+                                total_voto_opcion = 0
+                                color = 10
+                        
+                        data.append({
+                        'id': row[0],
+                        'valor': row[1],
+                        'porcentaje':   "{:.2f}".format(float(porcentaje)),
+                        'totalVoto': total_voto_opcion, 
+                        'color': color
+                        })
+
+                        i=i+1
+
+                response = {
+                'status':1,
+                'totalVotos': totalVotos,
+                'opciones': data,
+                }
+        else:
+                response = {
+                'status': 0
+                }
+
+       
+        return jsonify(response) 
+
+
+#sockets
+@socketio.on('conectar')
+def handle_join_room_event(data):
+        print("hola q tal estoy en el socket conectar")
+        app.logger.info("{} has joined the room {}".format(data['username'], data['room']))
+        join_room(data['room'])
+        socketio.emit('join_room_announcement', data, room=data['room'])
+        print("emiti el socket")

@@ -12,8 +12,7 @@ app.config["JWT_SECRET_KEY"] = "8as4d8as4asd48asd8asd4asd8"  # Change this!
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
-
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 from app.request import *
