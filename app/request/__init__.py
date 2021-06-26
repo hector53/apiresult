@@ -393,7 +393,7 @@ def votar_encuesta():
                 """ 
                 actualizar = updateData(sql)
                 if actualizar:
-                        socketio.emit('respuestaDelVoto', { "tipo": 1, "msj": "votaste", "id_encuesta": id_encuesta})
+                        socketio.emit('respuestaDelVoto', { "tipo": 1, "id_evento":id_evento, "msj": "votaste", "id_encuesta": id_encuesta})
                         return jsonify(result = status) 
                 else:
                         return jsonify(result = 3) 
@@ -401,6 +401,7 @@ def votar_encuesta():
 @app.route('/api/_cancelar_voto_not_registered' , methods=["GET"])
 def cancelar_voto():
         id_encuesta = request.args.get('id_encuesta', '')
+        id_evento = request.args.get('id_evento', '')
         miUid = request.args.get('u', '')
         sql = f"""
         DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id_encuesta}' and id_user = '{miUid}'
@@ -409,7 +410,7 @@ def cancelar_voto():
         response = {
         'status': actualizar,
         }
-        socketio.emit('respuestaDelVoto', {"tipo": 2, "msj": "cancelo el voto", "id_encuesta": int(id_encuesta)})
+        socketio.emit('respuestaDelVoto', {"tipo": 2, "msj": "cancelo el voto", "id_evento":id_evento, "id_encuesta": int(id_encuesta)})
         return jsonify(response) 
 
 
@@ -667,6 +668,16 @@ def get_encuestas_event():
                 id_evento = evento[0]
                 nameEvent = evento[1]
                 eventStatus = evento[7]
+                sql = f"""
+                update mn_eventos set modo = 0 where 
+                id = '{id_evento}'
+                """ 
+                updateEventoModo = updateData(sql)
+                sql = f"""
+                update mn_tipo_encuesta set play = 0 where 
+                id_evento = '{id_evento}'
+                """ 
+                updateEncuestasModoLive = updateData(sql)
                 print(nameEvent)
         else: 
                 print("no existe el evento ")
@@ -793,6 +804,7 @@ def get_event_by_cod_front():
                         "id_evento":  evento[0], 
                         "tipoUser": evento[6],
                         "statusEvent": evento[7],
+                        "modo": evento[5],
                         "encuestas": encuestaTipo
                         }
                 else: 
@@ -801,6 +813,7 @@ def get_event_by_cod_front():
                         "id_evento":  evento[0], 
                         "tipoUser": evento[6],
                         "statusEvent": evento[7],
+                        "modo": evento[5],
                         "encuestas": encuestaTipo
                         }
                
@@ -909,13 +922,113 @@ def publicar_evento():
         codigo = '{codigo}' and id_user = '{id_user}'
         """ 
         evento = updateData(sql)
-
+        socketio.emit('cambiarStatusEvent', { "codigo": codigo, "status": status})
         response = {
                 'status': 1
                 }
         return jsonify(response) 
 
 
+#activar modo live evento 
+@app.route('/api/modo_live_evento' , methods=["POST"])
+@jwt_required()
+def modo_live_evento():  
+        body = request.get_json()
+        modoLive = body["modoLive"]
+        id_user = get_jwt_identity()
+        codigo = body["codigo"]
+        sql = f"""
+        update mn_eventos set modo = '{modoLive}' , status = '{modoLive}' where 
+        codigo = '{codigo}' and id_user = '{id_user}'
+        """ 
+        evento = updateData(sql)
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        id_evento = evento[0]
+        #update encuesta posicion 1 a play 1
+        sql = f"""
+        update mn_tipo_encuesta set play = {modoLive} where 
+        id_evento = '{id_evento}' and id_user = '{id_user}' and posicion = 1
+        """ 
+        tipoEncuesta = updateData(sql)
+        socketio.emit('activarModoPresentacion', { "codigo": codigo, "modo": modoLive})
+        response = {
+                'status': 1
+                }
+        return jsonify(response) 
+
+#cambiar encuesta activa en modo live evento 
+@app.route('/api/modo_live_evento_encuesta_activa' , methods=["POST"])
+@jwt_required()
+def modo_live_evento_encuesta_activa():  
+        body = request.get_json()
+        id_user = get_jwt_identity()
+        codigo = body["codigo"]
+        idEncuesta =  body["id"]
+        
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        id_evento = evento[0]
+        #updte evento tambien 
+        sql = f"""
+        update mn_eventos set status = 1, modo = 1 where 
+        id = '{id_evento}' and id_user = '{id_user}' 
+        """ 
+        updateEvento = updateData(sql)
+        #update encuesta posicion 1 a play 1
+        sql = f"""
+        update mn_tipo_encuesta set play = 0 where 
+        id_evento = '{id_evento}' and id_user = '{id_user}' 
+        """ 
+        tipoEncuesta = updateData(sql)
+        sql = f"""
+        update mn_tipo_encuesta set play = 1 where 
+        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{idEncuesta}'
+        """ 
+        tipoEncuesta = updateData(sql)
+        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": idEncuesta})
+        response = {
+                'status': 1
+                }
+        return jsonify(response) 
+
+#get encuesta activa modo live event
+@app.route('/api/get_encuesta_event_live' ,  methods=["GET"])
+def get_encuesta_event_live():  
+        codigo = request.args.get('codigo', '')
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and modo = 1 " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and play = 1 " 
+                en = getDataOne(sql)
+                encuestaTipo = []
+                play = 0
+                if en:
+                        encuestaTipo.append( {
+                        'id': en[0], 
+                        'tipo': en[1],
+                        'titulo': en[2], 
+                        'posicion': en[3],
+                        'play': en[6]
+                        })
+                response = {
+                "status": 1, 
+                "id":  evento[0], 
+                "titulo": evento[1],
+                "statusEvent": evento[7],
+                "modo": evento[5],
+                "tipoEncuesta": encuestaTipo, 
+                }
+        else:
+                 response = {
+                "status": 0, 
+                 }
+
+        return jsonify(response)
 
 @app.route('/api/get_event_by_cod' , methods=["GET"])
 @jwt_required()
@@ -934,20 +1047,26 @@ def get_event_by_cod():
                 #buscar por uid las encuestas q tenga en la db 
                 encuestas = getData(sql)
                 encuestaTipo = []
+                play = 0
                 if encuestas:
                         for en in encuestas:
+                                if en[6] == 1:
+                                        play = en[0]
                                 encuestaTipo.append( {
                                 'id': en[0], 
                                 'tipo': en[1],
                                 'titulo': en[2], 
                                 'posicion': en[3],
+                                'play': en[6]
                                 })
                 response = {
                 "status": 1, 
                 "id":  evento[0], 
                 "titulo": evento[1],
                 "statusEvent": evento[7],
-                "tipoEncuesta": encuestaTipo
+                "modo": evento[5],
+                "tipoEncuesta": encuestaTipo, 
+                "encuestaActiva": play
                 }
         else:
                 response={
@@ -1016,3 +1135,4 @@ def handle_join_room_event(data):
         join_room(data['room'])
         socketio.emit('join_room_announcement', data, room=data['room'])
         print("emiti el socket")
+
