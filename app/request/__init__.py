@@ -522,10 +522,70 @@ def guardar_pregunta_tipo_1():
 
         if id == 0:
                 print("es nueva la creo")
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+                #buscar por uid las encuestas q tenga en la db 
+                enPosicion = getData(sql)
+                posicion = len(enPosicion) + 1
                 sql = f"""
-                INSERT INTO mn_tipo_encuesta ( tipo, titulo, id_user, id_evento, fecha) 
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion, id_user, id_evento, fecha) 
                 VALUES 
-                ( 1, '{pregunta}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                ( 1, '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                """ 
+                id_tipo = updateData(sql)
+                response = {
+                        "status": id_tipo, 
+                        "id": id_tipo
+                }
+        else:
+                print("es vieja la actualizo")
+                sql = f"""
+                update mn_tipo_encuesta set titulo = '{pregunta}', fecha = '{datetime.now()}' where 
+                id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id}'
+                """ 
+                id_tipo = updateData(sql)
+                response = {
+                        "status": 1, 
+                        "id": id
+                }
+        
+        return jsonify(response)
+
+
+
+@app.route('/api/guardar_pregunta_tipo_2' , methods=["POST"])
+@jwt_required()
+def guardar_pregunta_tipo_2():  
+        print("llegue aqui")
+        body = request.get_json()
+        id = body["id"]
+        pregunta = body["pregunta"]
+        id_user = get_jwt_identity()
+        codigo = body["codigo"]
+        #buscar id del evento por le codigo 
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}' " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        if evento: 
+                print("si existe el evento")
+                id_evento = evento[0]
+        else: 
+                print("no existe el evento pailas lo voto")
+                response = {
+                        "status": 0
+                }
+                return jsonify(response)
+
+        if id == 0:
+                print("es nueva la creo")
+                #necesito saber la posicion de la ultima encuesta 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+                #buscar por uid las encuestas q tenga en la db 
+                enPosicion = getData(sql)
+                posicion = len(enPosicion) + 1
+                sql = f"""
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion, id_user, id_evento, fecha) 
+                VALUES 
+                ( 2, '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
                 """ 
                 id_tipo = updateData(sql)
                 response = {
@@ -668,17 +728,8 @@ def get_encuestas_event():
                 id_evento = evento[0]
                 nameEvent = evento[1]
                 eventStatus = evento[7]
-                sql = f"""
-                update mn_eventos set modo = 0 where 
-                id = '{id_evento}'
-                """ 
-                updateEventoModo = updateData(sql)
-                sql = f"""
-                update mn_tipo_encuesta set play = 0 where 
-                id_evento = '{id_evento}'
-                """ 
-                updateEncuestasModoLive = updateData(sql)
-                print(nameEvent)
+                eventModo = evento[5]
+               
         else: 
                 print("no existe el evento ")
                 response = {
@@ -698,22 +749,22 @@ def get_encuestas_event():
                         idEcuesta = en[0]
                         tipo = en[1]
                         pregunta = en[2]
-                        #ahora busco las opciones 
-                        #cargar opciones 
-                        sqlOp = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = '{idEcuesta}' " 
-                        #buscar por uid las encuestas q tenga en la db 
-                        opcionesDb = getData(sqlOp)
-                        print("voy por opciones", opcionesDb)
-                        opcionesData = []
-                        for op in opcionesDb:
-                                opcionesData.append({
-                                'id': op[0],
-                                'opcion': op[1],
-                                })
 
-                        print("ya guarde las opciones")
-                        #agregar al array encuestas
                         if tipo == 1:
+                                #ahora busco las opciones 
+                                #cargar opciones 
+                                sqlOp = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = '{idEcuesta}' " 
+                                #buscar por uid las encuestas q tenga en la db 
+                                opcionesDb = getData(sqlOp)
+                                print("voy por opciones", opcionesDb)
+                                opcionesData = []
+                                for op in opcionesDb:
+                                        opcionesData.append({
+                                        'id': op[0],
+                                        'opcion': op[1],
+                                        })
+
+                                print("ya guarde las opciones")
                                 print("es tipo 1")
                                 encuestaTipo.append( {
                                  'tipo': tipo, 
@@ -723,12 +774,20 @@ def get_encuestas_event():
                                 'opciones2': opcionesData
                                 })
                                 print("ua guarte tipo 1", encuestaTipo)
-                print(nameEvent)
+                        if tipo == 2:
+                                encuestaTipo.append( {
+                                 'tipo': tipo, 
+                                'idEcuesta': idEcuesta,
+                                'pregunta': pregunta,
+                                })
+
+                                
                 response = {
                         "status": 1, 
                         "misencuestas": encuestaTipo, 
                         "eventName": nameEvent, 
-                        "eventStatus": eventStatus
+                        "eventStatus": eventStatus, 
+                        "eventModo": eventModo
                 }
 
                 return jsonify(response)
@@ -738,7 +797,8 @@ def get_encuestas_event():
                 response = {
                         "status": 0, 
                         "eventName": nameEvent, 
-                        "eventStatus": eventStatus
+                        "eventStatus": eventStatus, 
+                        "eventModo": eventModo
                 }
                 return jsonify(response)
 
@@ -809,7 +869,7 @@ def get_event_by_cod_front():
                         }
                 else: 
                         response = {
-                        "status": 1, 
+                        "status": 2, 
                         "id_evento":  evento[0], 
                         "tipoUser": evento[6],
                         "statusEvent": evento[7],
@@ -1030,6 +1090,66 @@ def get_encuesta_event_live():
 
         return jsonify(response)
 
+
+
+#get encuesta by id en modo live modal
+@app.route('/api/get_encuestas_by_id_live' ,  methods=["GET"])
+@jwt_required()
+def get_encuestas_by_id_live():  
+        id = request.args.get('id', '')
+        id_user = get_jwt_identity()
+        sql = f"SELECT * FROM mn_tipo_encuesta where id = '{id}' and id_user = '{id_user}' " 
+        #buscar por uid las encuestas q tenga en la db 
+        en = getDataOne(sql)
+        encuestaTipo = []
+        if en:
+                encuestaTipo.append( {
+                'id': en[0], 
+                'tipo': en[1],
+                'titulo': en[2], 
+                'posicion': en[3],
+                'play': en[6]
+                })
+                if en[1]==1:
+                        #cargar opciones 
+                        sqlOp = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = '{id}' " 
+                        #buscar por uid las encuestas q tenga en la db 
+                        opcionesDb = getData(sqlOp)
+                        opcionesData = []
+                        for op in opcionesDb:
+                                id_opcion = op[0]
+                                #buscar si hay votos en esta opcion
+                                sqlVo = f"SELECT * FROM mn_votos_choice where id_opcion = '{id_opcion}' " 
+                                #buscar por uid las encuestas q tenga en la db 
+                                votos = getData(sqlVo)
+                                sivotos = 0
+                                if votos:
+                                        sivotos = 1
+
+                                opcionesData.append({
+                                'id': op[0],
+                                'opcion': op[1],
+                                'votos': sivotos
+                                })
+
+                        response = {
+                        "status": 1, 
+                        "encuesta":  encuestaTipo, 
+                        "opciones": opcionesData,
+                        }
+                if en[1]==2:
+                        response = {
+                        "status": 1, 
+                        "encuesta":  encuestaTipo, 
+                        }
+                
+        else:
+                 response = {
+                "status": 0, 
+                 }
+
+        return jsonify(response)
+
 @app.route('/api/get_event_by_cod' , methods=["GET"])
 @jwt_required()
 def get_event_by_cod():
@@ -1049,6 +1169,7 @@ def get_event_by_cod():
                 encuestaTipo = []
                 play = 0
                 if encuestas:
+                        id_encuesta_primera = encuestas[0][0]
                         for en in encuestas:
                                 if en[6] == 1:
                                         play = en[0]
@@ -1059,15 +1180,31 @@ def get_event_by_cod():
                                 'posicion': en[3],
                                 'play': en[6]
                                 })
-                response = {
-                "status": 1, 
-                "id":  evento[0], 
-                "titulo": evento[1],
-                "statusEvent": evento[7],
-                "modo": evento[5],
-                "tipoEncuesta": encuestaTipo, 
-                "encuestaActiva": play
-                }
+
+                        if play == 0:
+                                print("poner activa la primera encuesta")
+                                sql = f"""
+                                update mn_tipo_encuesta set play = 1 where 
+                                id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_encuesta_primera}'
+                                """ 
+                                tipoEncuesta = updateData(sql)
+                                play = id_encuesta_primera
+                                #socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta_primera})
+       
+                
+                        response = {
+                        "status": 1, 
+                        "id":  evento[0], 
+                        "titulo": evento[1],
+                        "statusEvent": evento[7],
+                        "modo": evento[5],
+                        "tipoEncuesta": encuestaTipo, 
+                        "encuestaActiva": play
+                        }
+                else:
+                        response={
+                        "status": 2
+                        }
         else:
                 response={
                         "status": 0
@@ -1136,3 +1273,325 @@ def handle_join_room_event(data):
         socketio.emit('join_room_announcement', data, room=data['room'])
         print("emiti el socket")
 
+#create poll simple modo live 
+
+@app.route('/api/create_poll_simple_live' , methods=['POST'])
+@jwt_required()
+def create_poll_simple_live():
+        body = request.get_json()
+        print(body)
+        pregunta = body["pregunta"]
+        opciones = body["opciones"]
+        codigo = body["codigo"]
+        activar = body["activar"]
+        id_user = get_jwt_identity()
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+                #necesito saber la posicion de la ultima encuesta 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+                #buscar por uid las encuestas q tenga en la db 
+                enPosicion = getData(sql)
+                posicion = len(enPosicion) + 1
+                sql = f"""
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, fecha) VALUES ( 1,
+                '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                """ 
+                id_tipo_encuesta = updateData(sql)
+
+                for opcion in opciones:
+                        sql = f"""
+                        INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{opcion}',
+                        '{id_tipo_encuesta}' ) 
+                        """ 
+                        actualizar = updateData(sql)
+                if activar == 1:
+                        sql = f"""
+                        update mn_eventos set modo = 1, status = 1 where 
+                        id = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        eventoUpdate = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 0 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 1 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_tipo_encuesta})
+                response = {
+                'status': 1
+                }
+        else: 
+                response = {
+                'status': 0
+                }
+
+        return jsonify(response)
+
+#edit poll simple live
+
+@app.route('/api/edit_poll_simple_live' , methods=['POST'])
+@jwt_required()
+def edit_poll_simple_live():
+        body = request.get_json()
+        print(body)
+        pregunta = body["pregunta"]
+        opciones = body["opciones"]
+        modo = body["modo"]
+        codigo = body["codigo"]
+        id = body["id"]
+        opcionesNueva = body["opcionesNueva"]
+        id_user = get_jwt_identity()
+        sql = f"""
+        update mn_tipo_encuesta set titulo = '{pregunta}' where 
+        id = '{id}' and id_user = '{id_user}' 
+        """ 
+        tipoEncuesta = updateData(sql)
+        for op in opciones:
+                        opcionTexto = op["opcion"]
+                        opcionId = op["id"]
+                        sql = f"""
+                        update mn_tipo_encuesta_choice set opcion = '{opcionTexto}' where id = '{opcionId}' and id_tipo_encuesta = '{id}' 
+                                """ 
+                        actualizar = updateData(sql)
+        #ahora insertar las nuevas
+        for op2 in opcionesNueva:
+                sql = f"""
+                INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{op2}',
+                '{id}' ) 
+                """ 
+                actualizar = updateData(sql)
+        
+        if modo == 1:
+                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id})
+
+        response = {
+                'status': 1,
+                }
+
+        return jsonify(response)
+
+#edit poll nuibe de palabras live
+
+@app.route('/api/edit_nube_palabras_live' , methods=['POST'])
+@jwt_required()
+def edit_nube_palabras_live():
+        body = request.get_json()
+        print(body)
+        pregunta = body["pregunta"]
+        codigo = body["codigo"]
+        modo = body["modo"]
+        id = body["id"]
+        id_user = get_jwt_identity()
+        sql = f"""
+        update mn_tipo_encuesta set titulo = '{pregunta}' where 
+        id = '{id}' and id_user = '{id_user}' 
+        """ 
+        tipoEncuesta = updateData(sql)
+        if modo == 1:
+                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id})
+
+        response = {
+                'status': 1,
+                }
+
+        return jsonify(response)
+
+@app.route('/api/delete_poll_simple_live' , methods=["POST"])
+@jwt_required()
+def delete_poll_simple_live():
+        body = request.get_json()
+        id = body["id"]
+        id_opcion = body["id_opcion"]
+        id_user = get_jwt_identity()
+        print("id de la encuesta",id)
+        print("id de la opcion",id_opcion)
+        sql = f"""
+        DELETE FROM `mn_tipo_encuesta_choice` WHERE  id_tipo_encuesta = '{id}' and id = '{id_opcion}' 
+                """ 
+        actualizar = deleteData(sql)
+
+        sql = f"""
+        DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id}' and id_opcion = '{id_opcion}'
+                """ 
+        actualizar = deleteData(sql)
+        
+        response = {
+        'status': actualizar,
+        }
+        return jsonify(response) 
+
+
+
+@app.route('/api/delete_poll_simple_live_by_id' , methods=["POST"])
+@jwt_required()
+def delete_poll_simple_live_by_id():
+        body = request.get_json()
+        id = body["id"]
+        codigo = body["codigo"]
+        id_user = get_jwt_identity()
+        sql = f"SELECT * FROM mn_tipo_encuesta where id = '{id}' and id_user = '{id_user}'  " 
+        buscarTipo = getDataOne(sql)
+        tipo = 0
+        if buscarTipo:
+                tipo = buscarTipo[1]
+                sql = f"""
+                DELETE FROM `mn_tipo_encuesta` WHERE  id = '{id}' and id_user = '{id_user}'
+                """ 
+                actualizar = deleteData(sql)
+                if tipo == 1:
+                        sql = f"""
+                        DELETE FROM `mn_tipo_encuesta_choice` WHERE  id_tipo_encuesta = '{id}'
+                        """ 
+                        actualizar = deleteData(sql)
+
+                        sql = f"""
+                        DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id}' and id_user = '{id_user}'
+                        """ 
+                        actualizar = deleteData(sql)
+                if tipo == 2:
+                        sql = f"""
+                        DELETE FROM `mn_nube_palabras` WHERE  id_tipo_encuesta = '{id}'
+                        """ 
+                        actualizar = deleteData(sql)
+                
+                #buscar si quedan encuestas y poner activa la primera 
+                sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+                evento = getDataOne(sql)
+                if evento:
+                        id_evento = evento[0]
+                        #buscar encuestas del evento 
+                        sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id_user = '{id_user}' order by posicion asc " 
+                        misencuestas = getDataOne(sql)
+                        print(misencuestas)
+                        if misencuestas:
+                                id_encuesta_primera = misencuestas[0]
+                                #update 
+                                sql = f"""
+                                update  mn_tipo_encuesta set play = 1 where id = '{id_encuesta_primera}'  
+                                """ 
+                                actualizar = deleteData(sql)
+                                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta_primera})
+                        else:
+                                socketio.emit('cambioDeEncuesta', { "tipo": 5, "msj": "sin encuestas", "codigo":codigo})
+       
+                response = {
+                'status': actualizar,
+                }
+        else:
+                response = {
+                'status': 'error',
+                }
+                
+        return jsonify(response) 
+
+#nube de palabras 
+@app.route('/api/create_poll_nube_palabras_live' , methods=['POST'])
+@jwt_required()
+def create_poll_nube_palabras_live():
+        body = request.get_json()
+        print(body)
+        pregunta = body["pregunta"]
+        codigo = body["codigo"]
+        activar = body["activar"]
+        id_user = get_jwt_identity()
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+                #necesito saber la posicion de la ultima encuesta 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+                #buscar por uid las encuestas q tenga en la db 
+                enPosicion = getData(sql)
+                posicion = len(enPosicion) + 1
+                sql = f"""
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, fecha) VALUES ( 2,
+                '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                """ 
+                id_tipo_encuesta = updateData(sql)
+
+                if activar == 1:
+                        sql = f"""
+                        update mn_eventos set modo = 1, status = 1 where 
+                        id = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        eventoUpdate = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 0 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 1 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_tipo_encuesta})
+                response = {
+                'status': 1
+                }
+        else: 
+                response = {
+                'status': 0
+                }
+
+        return jsonify(response)
+
+
+@app.route('/api/get_respuestas_by_user_nube_palabras' , methods=["GET"])
+def get_respuestas_by_user_nube_palabras():
+        id_evento = request.args.get('id_evento', '')
+        id_encuesta = request.args.get('id_encuesta', '')
+        id_user = request.args.get('p', '')
+        sql2 = f"SELECT * FROM mn_tipo_encuesta where id = {id_encuesta} and id_evento = '{id_evento}'  " 
+        tipoEncuesta = getData(sql2)
+        if tipoEncuesta:
+                print("buscar nube de palabras si tiene respuestas")
+                sql3 = f"SELECT palabra, COUNT(palabra) as cantidad FROM mn_nube_palabras where id_tipo_encuesta = '{id_encuesta}' and id_evento = '{id_evento}' GROUP BY palabra   " 
+                nubePalabras = getData(sql3)
+                #ahora buscar si ya como usuario envie mi respeusta 
+                sql4 = f"SELECT * FROM mn_nube_palabras where id_tipo_encuesta = {id_encuesta} and id_evento = '{id_evento}' and id_user = '{id_user}'  " 
+                nubePalabrasRespuesta = getData(sql4)
+                siRespondi = 0
+                if nubePalabrasRespuesta: 
+                        siRespondi = 1
+                
+                response = {
+                'status':1,
+                'palabras': nubePalabras,
+                'siRespondi': siRespondi,
+                }
+        else:
+                response = {
+                'status': 0
+                }
+
+       
+        return jsonify(response) 
+
+@app.route('/api/add_palabra_live_front' , methods=['POST'])
+def add_palabra_live_front():
+        body = request.get_json()
+        palabra = body["palabra"]
+        id_evento = body["id_evento"]
+        id_encuesta = body["id_encuesta"]
+        id_user = body["p"]
+
+        sql = f"""
+        INSERT INTO mn_nube_palabras ( palabra, id_user, id_tipo_encuesta, id_evento, fecha) VALUES ( '{palabra}',
+        '{id_user}', '{id_encuesta}', '{id_evento}', '{datetime.now()}'  ) 
+        """ 
+        id_nube_palabras = updateData(sql)
+
+        socketio.emit('respuestaDelVoto', { "tipo": 2, "id_evento":id_evento, "msj": "Nueva palabra", "id_encuesta": id_encuesta})
+
+        response = {
+        'status': id_nube_palabras
+        }
+
+        return jsonify(response)
