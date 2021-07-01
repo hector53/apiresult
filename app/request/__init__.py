@@ -5,11 +5,11 @@ from app.schemas import *
 from datetime import datetime, timedelta
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from flask_socketio import join_room, leave_room
-import qrcode
 import time
 import math
 import string    
 import random
+import json
 
 
 def time_passed(fecha):
@@ -130,9 +130,7 @@ def create_poll_not_user():
     """ 
     id_tipo_encuesta = updateData(sql)
     data = url_site+miCodigo
-    QRCodefile = "app/static/img/qr/QR_"+miCodigo+".png"
-    QRimage = qrcode.make(data)
-    QRimage.save(QRCodefile)
+    
     for opcion in opciones:
         sql = f"""
         INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{opcion}',
@@ -729,6 +727,7 @@ def get_encuestas_event():
                 nameEvent = evento[1]
                 eventStatus = evento[7]
                 eventModo = evento[5]
+                fecha = evento[8]
                
         else: 
                 print("no existe el evento ")
@@ -787,7 +786,8 @@ def get_encuestas_event():
                         "misencuestas": encuestaTipo, 
                         "eventName": nameEvent, 
                         "eventStatus": eventStatus, 
-                        "eventModo": eventModo
+                        "eventModo": eventModo, 
+                        "fecha": str(fecha)
                 }
 
                 return jsonify(response)
@@ -798,7 +798,8 @@ def get_encuestas_event():
                         "status": 0, 
                         "eventName": nameEvent, 
                         "eventStatus": eventStatus, 
-                        "eventModo": eventModo
+                        "eventModo": eventModo, 
+                         "fecha": str(fecha)
                 }
                 return jsonify(response)
 
@@ -1580,6 +1581,7 @@ def add_palabra_live_front():
         palabra = body["palabra"]
         id_evento = body["id_evento"]
         id_encuesta = body["id_encuesta"]
+        codigo = body["codigo"]
         id_user = body["p"]
 
         sql = f"""
@@ -1587,7 +1589,7 @@ def add_palabra_live_front():
         '{id_user}', '{id_encuesta}', '{id_evento}', '{datetime.now()}'  ) 
         """ 
         id_nube_palabras = updateData(sql)
-
+        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
         socketio.emit('respuestaDelVoto', { "tipo": 2, "id_evento":id_evento, "msj": "Nueva palabra", "id_encuesta": id_encuesta})
 
         response = {
@@ -1595,3 +1597,27 @@ def add_palabra_live_front():
         }
 
         return jsonify(response)
+
+@app.route('/api/_sortear1' , methods=["GET"])
+def sortear1():
+        participantes = request.args.get('participantes', '')
+        premios = request.args.get('premios', '')
+        y = json.loads(participantes)
+        #cantidad de participantes 
+        cantParticipantes = len(y)
+        #lista de ganadores 
+        ganadores = []
+        while len(ganadores) < int(premios):
+                #generamos numero aleatorio
+                n = random.randint(1, cantParticipantes)
+                if n not in ganadores:
+                        #si no existe lo agrego 
+                        ganadores.append(y[(n-1)])
+
+        
+        response = {
+        'status': 1,
+        'participantes': y, 
+        'ganadores': ganadores
+        }
+        return jsonify(response) 
