@@ -357,9 +357,12 @@ def get_encuesta_not_registered():
 @app.route('/api/_votar_user_not' , methods=["POST"])
 def votar_encuesta():  
         body = request.get_json()
+        print(body)
         id_opcion = body["id_opcion"]
         id_encuesta = body["id_encuesta"]
         cookieNotUser = body["cookieNotUser"]
+        codigo = body["codigo"]
+        modoLive = body["liveMode"]
         id_evento = body["id_evento"]
         login = body["login"]
         miUid = cookieNotUser
@@ -391,6 +394,8 @@ def votar_encuesta():
                 """ 
                 actualizar = updateData(sql)
                 if actualizar:
+                        if modoLive == 1:
+                                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
                         socketio.emit('respuestaDelVoto', { "tipo": 1, "id_evento":id_evento, "msj": "votaste", "id_encuesta": id_encuesta})
                         return jsonify(result = status) 
                 else:
@@ -400,7 +405,10 @@ def votar_encuesta():
 def cancelar_voto():
         id_encuesta = request.args.get('id_encuesta', '')
         id_evento = request.args.get('id_evento', '')
+        codigo = request.args.get('codigo', '')
         miUid = request.args.get('u', '')
+        modoLive = request.args.get('modoLive', '')
+        print("modo live", modoLive)
         sql = f"""
         DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id_encuesta}' and id_user = '{miUid}'
                 """ 
@@ -408,7 +416,11 @@ def cancelar_voto():
         response = {
         'status': actualizar,
         }
-        socketio.emit('respuestaDelVoto', {"tipo": 2, "msj": "cancelo el voto", "id_evento":id_evento, "id_encuesta": int(id_encuesta)})
+        print("modo live cancelar voto", modoLive)
+        if modoLive=='1':
+                print("llegue a emitir el cancelar voto")
+                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
+        socketio.emit('respuestaDelVoto', { "tipo": 1, "id_evento":id_evento, "msj": "cancelo voto", "id_encuesta": id_encuesta})
         return jsonify(response) 
 
 
