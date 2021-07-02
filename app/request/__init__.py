@@ -1595,13 +1595,15 @@ def add_palabra_live_front():
         id_encuesta = body["id_encuesta"]
         codigo = body["codigo"]
         id_user = body["p"]
+        modoLive = body["liveMode"]
 
         sql = f"""
         INSERT INTO mn_nube_palabras ( palabra, id_user, id_tipo_encuesta, id_evento, fecha) VALUES ( '{palabra}',
         '{id_user}', '{id_encuesta}', '{id_evento}', '{datetime.now()}'  ) 
         """ 
         id_nube_palabras = updateData(sql)
-        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
+        if modoLive==1:
+                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
         socketio.emit('respuestaDelVoto', { "tipo": 2, "id_evento":id_evento, "msj": "Nueva palabra", "id_encuesta": id_encuesta})
 
         response = {
@@ -1632,4 +1634,20 @@ def sortear1():
         'participantes': y, 
         'ganadores': ganadores
         }
+        return jsonify(response) 
+
+@app.route('/api/get_event_by_codigo_buscador' , methods=["GET"])
+def get_event_by_codigo_buscador():
+        codigo = request.args.get('codigo', '')
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}'  " 
+        evento = getDataOne(sql)
+        if evento:
+                response = {
+                'status': 1,
+                }
+        else:
+                response = {
+                'status': 0,
+                }
+
         return jsonify(response) 
