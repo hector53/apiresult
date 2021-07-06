@@ -10,7 +10,6 @@ url_site = "http://apiresult.jemyxs2xli-zqy3jz1yy6kg.p.runcloud.link/"
 
 
 
-
 #datos localhost
 """
 datos = {
