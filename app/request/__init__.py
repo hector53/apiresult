@@ -10,7 +10,6 @@ import math
 import string    
 import random
 import json
-import dateutil.parser
 
 def time_passed(fecha):
         mesFecha = ["Ene", "Feb","Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
