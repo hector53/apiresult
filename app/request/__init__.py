@@ -10,7 +10,7 @@ import math
 import string    
 import random
 import json
-
+import dateutil.parser
 
 def time_passed(fecha):
         mesFecha = ["Ene", "Feb","Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
@@ -504,8 +504,19 @@ def crear_evento():
         descripcion = body["descripcion"]
         id_user = get_jwt_identity()
         codigo = codigoAleatorio(5)
+
+        #buscar eventos del usuario el ultimo para saber el id
+        sql = f"SELECT * FROM mn_eventos where id_user = '{id_user}' order by id desc " 
+        #buscar por uid las encuestas q tenga en la db 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+        else:
+                id_evento = 0
         
         if titulo:
+                numeroF = format((id_evento+1), "03d")
+                titulo = f"{titulo}_{numeroF}"  
                 sql = f"""
                 INSERT INTO mn_eventos ( titulo, descripcion, codigo, id_user, modo, tipoUser,  status, fecha) 
                 VALUES 
@@ -784,6 +795,7 @@ def get_encuestas_event():
                         tipo = en[1]
                         pregunta = en[2]
                         multiple = en[7]
+                        premios = en[9]
 
                         if tipo == 1:
                                 #ahora busco las opciones 
@@ -841,6 +853,7 @@ def get_encuestas_event():
                                  'tipo': tipo, 
                                 'idEcuesta': idEcuesta,
                                 'pregunta': pregunta,
+                                'premios': premios,
                                 'participantes': integrantes, 
                                 'ganadores': ganadores, 
                                 'id_evento': id_evento
@@ -855,7 +868,7 @@ def get_encuestas_event():
                         "eventName": nameEvent, 
                         "eventStatus": eventStatus, 
                         "eventModo": eventModo, 
-                        "fecha": str(fecha)
+                        "fecha": str(fecha.date())
                 }
 
                 return jsonify(response)
@@ -867,7 +880,7 @@ def get_encuestas_event():
                         "eventName": nameEvent, 
                         "eventStatus": eventStatus, 
                         "eventModo": eventModo, 
-                         "fecha": str(fecha)
+                         "fecha": str(fecha.date())
                 }
                 return jsonify(response)
 
@@ -1680,8 +1693,22 @@ def create_sorteo_live():
                         """ 
                         tipoEncuesta = updateData(sql)
                         socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_tipo_encuesta})
+                
+                #buscar participantes
+                sql2 = f"SELECT * FROM mn_sorteos_participantes where id_encuesta = {id_tipo_encuesta}  "
+                participantes = getData(sql2)
+                #ahora buscar si ya como usuario envie mi respeusta
+                integrantes = [] 
+                for row in participantes:
+                        integrantes.append({
+                        'id': row[0],
+                        'value': row[1],
+                        })
+
                 response = {
-                'status': 1
+                'status': 1, 
+                'id': id_tipo_encuesta, 
+                'participantes': integrantes
                 }
         else: 
                 response = {
