@@ -4,13 +4,13 @@ from app import socketio
 from app.schemas import *
 from datetime import datetime, timedelta
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from flask_socketio import join_room, leave_room
+from flask_socketio import join_room, leave_room, rooms
 import time
 import math
 import string    
 import random
 import json
-
+clientes = []
 def time_passed(fecha):
         mesFecha = ["Ene", "Feb","Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
         "Oct", "Nov", "Dic"  ];
@@ -1359,11 +1359,43 @@ def get_encuesta_by_id_result():
 #sockets
 @socketio.on('conectar')
 def handle_join_room_event(data):
+        socketId =  rooms()
+        print("id de usuario conectado", socketId)
         print("hola q tal estoy en el socket conectar")
+        #aqui guardar en la db el cliente conectado
+        sql = f"SELECT * FROM mn_clientes_conectados where id_user = '{data['username']}' and codigo_evento = '{data['room']}'  " 
+        cliente = getDataOne(sql)
+        if cliente: 
+                print("ya esta conectado")
+        else:
+                sql = f"""
+                INSERT INTO mn_clientes_conectados ( id_room, codigo_evento, id_user) VALUES ( '{socketId[0]}',
+                '{data['room']}', '{data['username']}' ) 
+                """ 
+                actualizar = updateData(sql)
+
         app.logger.info("{} has joined the room {}".format(data['username'], data['room']))
         join_room(data['room'])
-        socketio.emit('join_room_announcement', data, room=data['room'])
+        #en este emit debo enviar las personas conectadas al evento
+        sql = f"SELECT * FROM mn_clientes_conectados where  codigo_evento = '{data['room']}'  " 
+        clientes = getData(sql)
+        conectados = len(clientes)
+        socketio.emit('join_room_announcement', {'username': data['username'], 'codigo': data['room'], 'conectados': conectados})
         print("emiti el socket")
+
+
+@socketio.on('desconectar')
+def desconectar_user_modo_live_event(data):
+        print(data)
+        sql = f"""
+        delete from mn_clientes_conectados where id_room = '{request.sid}' 
+        """ 
+        actualizar = updateData(sql)
+        sql = f"SELECT * FROM mn_clientes_conectados where  codigo_evento = '{data['room']}'  " 
+        clientes = getData(sql)
+        conectados = len(clientes)
+        socketio.emit('join_room_disconect', {'username': data['username'], 'codigo': data['room'], 'conectados': conectados})
+        print('Client disconnected', request.sid)
 
 #create poll simple modo live 
 
@@ -1716,6 +1748,85 @@ def create_sorteo_live():
 
         return jsonify(response)
 
+#edit sorteo modal live
+
+@app.route('/api/edit_sorteo_live_modal' , methods=['POST'])
+@jwt_required()
+def edit_sorteo_live_modal():
+        body = request.get_json()
+        print(body)
+        titulo = body["titulo"]
+        participantes = body["participantes"]
+        participantesArray = json.loads(participantes)
+        print("participantes", participantesArray)
+        #cantidad de participantes 
+        premios = body["premios"]
+        codigo = body["codigo"]
+        activar = body["activar"]
+        id_encuesta = body["id_encuesta"]
+        id_user = get_jwt_identity()
+
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+                
+
+
+                sql = f"""
+                update  mn_tipo_encuesta set titulo = '{titulo}',
+                premios = '{premios}' where id =  '{id_encuesta}' and id_user = '{id_user}'
+                and id_evento = '{id_evento}'
+                """ 
+                id_tipo_encuesta = updateData(sql)
+
+                #ahora borro los participantes viejos y añado los nuevos
+                sql = f"""
+                DELETE FROM `mn_sorteos_participantes` WHERE  id_encuesta = '{id_encuesta}'
+                """ 
+                actualizar = deleteData(sql)
+
+                #agregar participantes
+                for lis in participantesArray:
+                        sql = f"""
+                        INSERT INTO mn_sorteos_participantes ( value, id_encuesta) VALUES ( '{lis}',
+                        '{id_encuesta}' ) 
+                        """ 
+                        id_participante = updateData(sql)
+
+                if activar == 1:
+                        sql = f"""
+                        update mn_eventos set modo = 1, status = 1 where 
+                        id = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        eventoUpdate = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 0 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 1 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_tipo_encuesta})
+                
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id = '{id_encuesta}' and play = 1  " 
+                tipoE = getDataOne(sql)
+                if tipoE:
+                        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_tipo_encuesta})
+
+                response = {
+                'status': 1, 
+                }
+        else: 
+                response = {
+                'status': 0
+                }
+
+        return jsonify(response)
+
 
 @app.route('/api/get_respuestas_by_user_nube_palabras' , methods=["GET"])
 def get_respuestas_by_user_nube_palabras():
@@ -1784,6 +1895,39 @@ def get_datos_sorteo_by_id_encuesta():
                 'participantes': integrantes,
                 'premios': tipoEncuesta[9], 
                 'ganadores': ganadores
+                }
+        else:
+                response = {
+                'status': 0
+                }
+
+       
+        return jsonify(response) 
+
+#get sorteo by id encuesta 
+#get sorteo activo modo live 
+@app.route('/api/get__sorteo_by_id_encuesta_modal' , methods=["GET"])
+def get__sorteo_by_id_encuesta_modal():
+        id_encuesta = request.args.get('id_encuesta', '')
+        id_user = request.args.get('p', '')
+        sql2 = f"SELECT * FROM mn_tipo_encuesta where id = {id_encuesta} and id_user = '{id_user}'  " 
+        tipoEncuesta = getDataOne(sql2)
+        if tipoEncuesta:
+                print(tipoEncuesta)
+                #buscar participantes
+                sql2 = f"SELECT * FROM mn_sorteos_participantes where id_encuesta = {id_encuesta}  "
+                participantes = getData(sql2)
+                #ahora buscar si ya como usuario envie mi respeusta
+                integrantes = ''
+                
+                for row in participantes:
+                        integrantes = integrantes + row[1] + '\n'
+                
+                response = {
+                'status':1,
+                'titulo':tipoEncuesta[2],
+                'participantes': integrantes,
+                'premios': tipoEncuesta[9], 
                 }
         else:
                 response = {
@@ -1892,5 +2036,20 @@ def get_event_by_codigo_buscador():
                 response = {
                 'status': 0,
                 }
+
+        return jsonify(response) 
+
+
+#get conectados al rooms
+
+@app.route('/api/get_users_conectados' , methods=["GET"])
+def get_users_conectados():
+        codigo = request.args.get('codigo', '')
+        
+        print(request.sid)
+
+        response = {
+        'status': 1,
+        }
 
         return jsonify(response) 
