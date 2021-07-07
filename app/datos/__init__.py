@@ -6,7 +6,7 @@ datos = {
     "userDb" : "nacho",
     "userPass":"nacho*123",
 }
-url_site = "https://result.app/"
+url_site = "https://api.result.app/"
 
 
 
