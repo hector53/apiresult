@@ -679,7 +679,10 @@ def guardar_opciones_tipo_1():
                 sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
                 #buscar por uid las encuestas q tenga en la db 
                 enPosicion = getData(sql)
-                posicion = len(enPosicion) + 1
+                if enPosicion:
+                        posicion = enPosicion[3]+1
+                else:
+                        posicion = 0+1
 
                 sql = f"""
                 INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion, id_user, id_evento, extra, fecha) 
@@ -1089,17 +1092,28 @@ def modo_live_evento():
         id_evento = evento[0]
         #update encuesta posicion 1 a play 1
         print("modo live", modoLive)
-        if modoLive == '0': 
+        if modoLive == 0: 
                 print("modo live 0")
                 sql = f"""
                 update mn_tipo_encuesta set play = 0 where 
                 id_evento = '{id_evento}' and id_user = '{id_user}' 
                 """ 
+                print(sql)
                 tipoEncuesta = updateData(sql)
         else:
+                print("poner activa la primera encuesta")
+                sql = f"""
+                update mn_tipo_encuesta set play = 0 where 
+                id_evento = '{id_evento}' and id_user = '{id_user}' 
+                """ 
+                tipoEncuesta = updateData(sql)
+                #buscar la encuesta uno ordenada por posicion 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id_user = '{id_user}' order by posicion asc  " 
+                primeraEncuesta = getDataOne(sql)
+
                 sql = f"""
                 update mn_tipo_encuesta set play = {modoLive} where 
-                id_evento = '{id_evento}' and id_user = '{id_user}' and posicion = 1
+                id_evento = '{id_evento}' and id_user = '{id_user}' and posicion = '{primeraEncuesta[3]}'
                 """ 
                 tipoEncuesta = updateData(sql)
         
@@ -1273,17 +1287,6 @@ def get_event_by_cod():
                                 'play': en[6]
                                 })
 
-                        if play == 0:
-                                print("poner activa la primera encuesta")
-                                sql = f"""
-                                update mn_tipo_encuesta set play = 1 where 
-                                id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_encuesta_primera}'
-                                """ 
-                                tipoEncuesta = updateData(sql)
-                                play = id_encuesta_primera
-                                #socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta_primera})
-       
-                
                         response = {
                         "status": 1, 
                         "id":  evento[0], 
@@ -1368,11 +1371,18 @@ def handle_join_room_event(data):
         if cliente: 
                 print("ya esta conectado")
         else:
-                sql = f"""
-                INSERT INTO mn_clientes_conectados ( id_room, codigo_evento, id_user) VALUES ( '{socketId[0]}',
-                '{data['room']}', '{data['username']}' ) 
-                """ 
-                actualizar = updateData(sql)
+                #buscar si el dueño del evento para no sumarlo
+                sql = f"SELECT * FROM mn_eventos where id_user = '{data['username']}' and codigo = '{data['room']}'  " 
+                adminEvento = getDataOne(sql)
+                if adminEvento: 
+                        print("no guardar")
+                else:
+                        sql = f"""
+                        INSERT INTO mn_clientes_conectados ( id_room, codigo_evento, id_user) VALUES ( '{socketId[0]}',
+                        '{data['room']}', '{data['username']}' ) 
+                        """ 
+                        actualizar = updateData(sql)
+                
 
         app.logger.info("{} has joined the room {}".format(data['username'], data['room']))
         join_room(data['room'])
@@ -1416,10 +1426,13 @@ def create_poll_simple_live():
         if evento:
                 id_evento = evento[0]
                 #necesito saber la posicion de la ultima encuesta 
-                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion desc " 
                 #buscar por uid las encuestas q tenga en la db 
-                enPosicion = getData(sql)
-                posicion = len(enPosicion) + 1
+                enPosicion = getDataOne(sql)
+                if enPosicion:
+                        posicion = enPosicion[3]+1
+                else:
+                        posicion = 0+1
                 sql = f"""
                 INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, extra, fecha) VALUES ( 1,
                 '{pregunta}', '{posicion}', '{id_user}', '{id_evento}', '{multiple}', '{datetime.now()}'  ) 
@@ -1586,6 +1599,11 @@ def delete_poll_simple_live_by_id():
                         DELETE FROM `mn_nube_palabras` WHERE  id_tipo_encuesta = '{id}'
                         """ 
                         actualizar = deleteData(sql)
+                if tipo == 3:
+                        sql = f"""
+                        DELETE FROM `mn_sorteos_participantes` WHERE  id_encuesta = '{id}'
+                        """ 
+                        actualizar = deleteData(sql)
                 
                 #buscar si quedan encuestas y poner activa la primera 
                 sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
@@ -1603,7 +1621,7 @@ def delete_poll_simple_live_by_id():
                                 update  mn_tipo_encuesta set play = 1 where id = '{id_encuesta_primera}'  
                                 """ 
                                 actualizar = deleteData(sql)
-                                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta_primera})
+                                socketio.emit('cambioDeEncuesta', { "tipo": 3, "msj": "elimine una encuesta", "codigo":codigo, "id_encuesta": id_encuesta_primera})
                         else:
                                 socketio.emit('cambioDeEncuesta', { "tipo": 5, "msj": "sin encuestas", "codigo":codigo})
        
@@ -1632,10 +1650,15 @@ def create_poll_nube_palabras_live():
         if evento:
                 id_evento = evento[0]
                 #necesito saber la posicion de la ultima encuesta 
-                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion desc " 
                 #buscar por uid las encuestas q tenga en la db 
-                enPosicion = getData(sql)
-                posicion = len(enPosicion) + 1
+                enPosicion = getDataOne(sql)
+                if enPosicion:
+                        posicion = enPosicion[3]+1
+                else:
+                        posicion = 0+1
+
+                
                 sql = f"""
                 INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, fecha) VALUES ( 2,
                 '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
@@ -1690,10 +1713,10 @@ def create_sorteo_live():
         if evento:
                 id_evento = evento[0]
                 #necesito saber la posicion de la ultima encuesta 
-                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion desc " 
                 #buscar por uid las encuestas q tenga en la db 
-                enPosicion = getData(sql)
-                posicion = len(enPosicion) + 1
+                enPosicion = getDataOne(sql)
+                posicion = enPosicion[3]+1
                 sql = f"""
                 INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, premios, fecha) VALUES ( 3,
                 '{titulo}', '{posicion}', '{id_user}', '{id_evento}', '{premios}',  '{datetime.now()}'  ) 
