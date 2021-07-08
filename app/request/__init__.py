@@ -1110,10 +1110,15 @@ def modo_live_evento():
                 #buscar la encuesta uno ordenada por posicion 
                 sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id_user = '{id_user}' order by posicion asc  " 
                 primeraEncuesta = getDataOne(sql)
+                if primeraEncuesta:
+                        posiPri = primeraEncuesta[3]
+                else:
+                        posiPri = 0
+
 
                 sql = f"""
                 update mn_tipo_encuesta set play = {modoLive} where 
-                id_evento = '{id_evento}' and id_user = '{id_user}' and posicion = '{primeraEncuesta[3]}'
+                id_evento = '{id_evento}' and id_user = '{id_user}' and posicion = '{posiPri}'
                 """ 
                 tipoEncuesta = updateData(sql)
         
