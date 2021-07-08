@@ -566,8 +566,11 @@ def guardar_pregunta_tipo_1():
                 print("es nueva la creo")
                 sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
                 #buscar por uid las encuestas q tenga en la db 
-                enPosicion = getData(sql)
-                posicion = len(enPosicion) + 1
+                enPosicion = getDataOne(sql)
+                if enPosicion:
+                        posicion = enPosicion[3]+1
+                else:
+                        posicion = 0+1
                 sql = f"""
                 INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion, id_user, id_evento, fecha) 
                 VALUES 
@@ -622,8 +625,11 @@ def guardar_pregunta_tipo_2():
                 #necesito saber la posicion de la ultima encuesta 
                 sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
                 #buscar por uid las encuestas q tenga en la db 
-                enPosicion = getData(sql)
-                posicion = len(enPosicion) + 1
+                enPosicion = getDataOne(sql)
+                if enPosicion:
+                        posicion = enPosicion[3]+1
+                else:
+                        posicion = 0+1
                 sql = f"""
                 INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion, id_user, id_evento, fecha) 
                 VALUES 
@@ -678,7 +684,7 @@ def guardar_opciones_tipo_1():
                 #consultar la posicion 
                 sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion asc " 
                 #buscar por uid las encuestas q tenga en la db 
-                enPosicion = getData(sql)
+                enPosicion = getDataOne(sql)
                 if enPosicion:
                         posicion = enPosicion[3]+1
                 else:
@@ -1721,7 +1727,10 @@ def create_sorteo_live():
                 sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion desc " 
                 #buscar por uid las encuestas q tenga en la db 
                 enPosicion = getDataOne(sql)
-                posicion = enPosicion[3]+1
+                if enPosicion:
+                        posicion = enPosicion[3]+1
+                else:
+                        posicion = 0+1
                 sql = f"""
                 INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, premios, fecha) VALUES ( 3,
                 '{titulo}', '{posicion}', '{id_user}', '{id_evento}', '{premios}',  '{datetime.now()}'  ) 
