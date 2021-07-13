@@ -1919,10 +1919,10 @@ def create_diayhora_live():
                                 utc = horaini.replace(tzinfo=from_zone)
                                 central = utc.astimezone(to_zone)
                                 print(central)
-
+                                horaini = str(central)
 
                                 sql = f"""
-                                INSERT INTO mn_date_horas ( hora, id_date_day) VALUES ( '{central}',
+                                INSERT INTO mn_date_horas ( hora, id_date_day) VALUES ( '{horaini[:19]}',
                                 '{id_dia}' ) 
                                 """ 
                                 id_hora = updateData(sql)
