@@ -2038,21 +2038,66 @@ def get_datos_diayhora_by_id_encuesta():
                 dias = getData(sql2)
                 #ahora buscar si ya como usuario envie mi respeusta
                 diasyhoras = [] 
+                #buscar horas ganadoras para tenerlas aquí :D 
+                sql2 = f"SELECT id_date_hora, count(id_date_hora) as votos FROM `mn_date_horas_votos` where id_tipo_encuesta = '{id_encuesta}' GROUP by id_date_hora order by votos desc limit 0,2  "
+                votosGanadores = getData(sql2)
+                uno = 0
+                votoGanador = 0
+                id_mayorVoto = 0
+                siHayMayorVoto = 0
+                for unG in votosGanadores:
+                        if uno == 0: 
+                                votoGanador = unG[1]
+                                id_mayorVoto = unG[0]
+                        else:
+                                if votoGanador > unG[1]:
+                                        siHayMayorVoto = 1
+                        uno = uno+1
+
+
                 for row in dias:
                         id_dia = row[0]
-                        sql2 = f"SELECT * FROM mn_date_horas where id_date_day = {id_dia}  "
+                        sql2 = f"SELECT * FROM mn_date_horas where id_date_day = {id_dia} order by hora asc  "
                         horas = getData(sql2)
                         horasDia = []
                         for h in horas:
+                                id_hora = h[0]
                                 mihora = h[1]
                                 minutos = mihora.minute
                                 if minutos < 10:
                                         minutos = "0" + str(minutos)
+                                #buscar los votos de esta hora y si ha votado en esta hora 
+                                sql2 = f"SELECT * FROM mn_date_horas_votos where id_date_hora = {id_hora}  "
+                                votosHoras = getData(sql2)
+                                cantVotosHoras = len(votosHoras)
+                                #buscar si el usuario voto en esta hora 
+                                sql2 = f"SELECT * FROM mn_date_horas_votos where id_date_hora = {id_hora} and id_user = '{id_user}'  "
+                                siVoteHora = getData(sql2)
+                                if siVoteHora:
+                                        sivoteH = 1
+                                else:
+                                        sivoteH = 0
+
+                                #ver si es ganador o no 
+                                votoGanador = 0
+                                if siHayMayorVoto==1:
+                                        if h[0] == id_mayorVoto:
+                                                votoGanador = 1
+                                else:
+                                        for win in votosGanadores:
+                                                if h[0] == win[0]:
+                                                        votoGanador = 1
+                                
+
                                 horasDia.append({
                                 'id': h[0],
                                 'fecha': h[1],
                                 'hora': mihora.hour, 
-                                'minutos': minutos
+                                'minutos': minutos, 
+                                'cantVotos': cantVotosHoras, 
+                                'siVote': sivoteH, 
+                                'votoGanador': votoGanador
+
                                 })
                         my_date = datetime.strptime(str(row[1]), "%Y-%m-%d")
                         mes = my_date.month
@@ -2060,19 +2105,25 @@ def get_datos_diayhora_by_id_encuesta():
                         if dia < 10:
                                 dia = "0" + str(dia)
                         
+                        
+                        
 
                         diasyhoras.append({
                                 'id': id_dia,
                                 'fecha': row[1],
                                 'horas': horasDia, 
                                 'mes': mesFecha[(mes-1)],
-                                'dia': dia
+                                'dia': dia, 
+                               
                                 })
                 
-               
+                #buscar cantidad de votos totales de la encuesta
+                sql2 = f"SELECT * FROM mn_date_horas_votos where id_tipo_encuesta = {id_encuesta}  "
+                votosTotales = getData(sql2)
                 response = {
                 'status':1,
                 'dias': diasyhoras,
+                'votosTotales': len(votosTotales)
                 }
         else:
                 response = {
@@ -2137,6 +2188,49 @@ def add_palabra_live_front():
         response = {
         'status': id_nube_palabras
         }
+
+        return jsonify(response)
+
+#votar encuesta dia y hora 
+@app.route('/api/votar_encuesta_dia_y_hora_front' , methods=['POST'])
+def votar_encuesta_dia_y_hora_front():
+        body = request.get_json()
+        hora = body["hora"]
+        codigo = body["codigo"]
+        id_evento = body["id_evento"]
+        id_encuesta = body["id_encuesta"]
+        id_user = body["p"]
+        modoLive = body["liveMode"]
+        #crear funciones para validar q el id del evento existe y q el usuario existe
+
+        sql = f"SELECT * FROM mn_date_horas_votos where id_date_hora = '{hora}' and id_user = '{id_user}'  " 
+        votoHora = getDataOne(sql)
+        if votoHora:
+                #ya votó
+                sql = f"""
+                DELETE FROM mn_date_horas_votos where id_date_hora = '{hora}' and id_user = '{id_user}'
+                and id_tipo_encuesta = '{id_encuesta}' and id_evento = '{id_evento}'
+                """ 
+                id_voto_hora = updateData(sql)
+                response = {
+                        'status': 0
+                }
+        else:
+                #votar 
+                sql = f"""
+                INSERT INTO mn_date_horas_votos ( id_date_hora, id_user, id_tipo_encuesta, id_evento, fecha) VALUES ( '{hora}',
+                '{id_user}', '{id_encuesta}', '{id_evento}', '{datetime.now()}'  ) 
+                """ 
+                id_voto_hora = updateData(sql)
+                response = {
+                        'status': 1, 
+                        'id_voto': id_voto_hora
+                }
+        
+        if modoLive==1:
+                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
+        socketio.emit('respuestaDelVoto', { "tipo": 4, "id_evento":id_evento, "msj": "Nueva voto en hora", "id_encuesta": id_encuesta})
+
 
         return jsonify(response)
 
