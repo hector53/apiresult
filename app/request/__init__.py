@@ -11,9 +11,11 @@ import string
 import random
 import json
 clientes = []
-def time_passed(fecha):
-        mesFecha = ["Ene", "Feb","Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
+
+mesFecha = ["Ene", "Feb","Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
         "Oct", "Nov", "Dic"  ];
+def time_passed(fecha):
+       
         timestamp = datetime.strptime(fecha, '%Y-%m-%d %H:%M:%S')
         timestamp = datetime.timestamp(timestamp)
         print("timestamp",timestamp)
@@ -1864,6 +1866,85 @@ def edit_sorteo_live_modal():
 
         return jsonify(response)
 
+#create dia y hora live q
+
+
+@app.route('/api/create_diayhora_live' , methods=['POST'])
+@jwt_required()
+def create_diayhora_live():
+        body = request.get_json()
+        titulo = body["titulo"]
+        dias = body["dias"]
+        diasArray = json.loads(dias)
+        horas = body["horas"]
+        horasArray = json.loads(horas)
+        print(horasArray)
+        #cantidad de participantes 
+        codigo = body["codigo"]
+        activar = body["activar"]
+        id_user = get_jwt_identity()
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+                #necesito saber la posicion de la ultima encuesta 
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion desc " 
+                #buscar por uid las encuestas q tenga en la db 
+                enPosicion = getDataOne(sql)
+                if enPosicion:
+                        posicion = enPosicion[3]+1
+                else:
+                        posicion = 0+1
+                sql = f"""
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento,  fecha) VALUES ( 4,
+                '{titulo}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                """ 
+                id_tipo_encuesta = updateData(sql)
+                #agregar participantes
+                for d in horasArray:
+                        fechaDia = d['id']
+                        sql = f"""
+                        INSERT INTO mn_date_day ( fecha, id_encuesta) VALUES ( '{fechaDia}',
+                        '{id_tipo_encuesta}' ) 
+                        """ 
+                        id_dia = updateData(sql)
+                        for h in d['horas']:
+                                horaini = h['ini']
+                                sql = f"""
+                                INSERT INTO mn_date_horas ( hora, id_date_day) VALUES ( '{horaini}',
+                                '{id_dia}' ) 
+                                """ 
+                                id_hora = updateData(sql)
+
+                if activar == 1:
+                        sql = f"""
+                        update mn_eventos set modo = 1, status = 1 where 
+                        id = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        eventoUpdate = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 0 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 1 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_tipo_encuesta})
+                
+                response = {
+                'status': 1, 
+                'id': id_tipo_encuesta, 
+                }
+        else: 
+                response = {
+                'status': 0
+                }
+
+        return jsonify(response)
+
 
 @app.route('/api/get_respuestas_by_user_nube_palabras' , methods=["GET"])
 def get_respuestas_by_user_nube_palabras():
@@ -1932,6 +2013,66 @@ def get_datos_sorteo_by_id_encuesta():
                 'participantes': integrantes,
                 'premios': tipoEncuesta[9], 
                 'ganadores': ganadores
+                }
+        else:
+                response = {
+                'status': 0
+                }
+
+       
+        return jsonify(response) 
+
+
+#get diayhora activo modo live 
+@app.route('/api/get_datos_diayhora_by_id_encuesta' , methods=["GET"])
+def get_datos_diayhora_by_id_encuesta():
+        id_evento = request.args.get('id_evento', '')
+        id_encuesta = request.args.get('id_encuesta', '')
+        id_user = request.args.get('p', '')
+        sql2 = f"SELECT * FROM mn_tipo_encuesta where id = {id_encuesta} and id_evento = '{id_evento}'  " 
+        tipoEncuesta = getDataOne(sql2)
+        if tipoEncuesta:
+                print(tipoEncuesta)
+                #buscar participantes
+                sql2 = f"SELECT * FROM mn_date_day where id_encuesta = {id_encuesta}  "
+                dias = getData(sql2)
+                #ahora buscar si ya como usuario envie mi respeusta
+                diasyhoras = [] 
+                for row in dias:
+                        id_dia = row[0]
+                        sql2 = f"SELECT * FROM mn_date_horas where id_date_day = {id_dia}  "
+                        horas = getData(sql2)
+                        horasDia = []
+                        for h in horas:
+                                mihora = h[1]
+                                minutos = mihora.minute
+                                if minutos < 10:
+                                        minutos = "0" + str(minutos)
+                                horasDia.append({
+                                'id': h[0],
+                                'fecha': h[1],
+                                'hora': mihora.hour, 
+                                'minutos': minutos
+                                })
+                        my_date = datetime.strptime(str(row[1]), "%Y-%m-%d")
+                        mes = my_date.month
+                        dia = my_date.day
+                        if dia < 10:
+                                dia = "0" + str(dia)
+                        
+
+                        diasyhoras.append({
+                                'id': id_dia,
+                                'fecha': row[1],
+                                'horas': horasDia, 
+                                'mes': mesFecha[(mes-1)],
+                                'dia': dia
+                                })
+                
+               
+                response = {
+                'status':1,
+                'dias': diasyhoras,
                 }
         else:
                 response = {
