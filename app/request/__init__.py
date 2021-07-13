@@ -1914,7 +1914,7 @@ def create_diayhora_live():
                         id_dia = updateData(sql)
                         for h in d['horas']:
                                 horaini = h['ini']      
-                                horaini = datetime.strptime(horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                                horaini = datetime.strptime(horaini, '%Y-%m-%dT%H:%M:%S')
                                 #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
                                 utc = horaini.replace(tzinfo=from_zone)
                                 central = utc.astimezone(to_zone)
