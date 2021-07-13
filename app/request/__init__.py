@@ -10,6 +10,7 @@ import math
 import string    
 import random
 import json
+from dateutil import tz
 clientes = []
 
 mesFecha = ["Ene", "Feb","Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
@@ -1883,6 +1884,9 @@ def create_diayhora_live():
         codigo = body["codigo"]
         activar = body["activar"]
         id_user = get_jwt_identity()
+        # METHOD 1: Hardcode zones:
+        from_zone = tz.gettz('UTC')
+        to_zone = tz.gettz('America/Caracas')
         sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
         evento = getDataOne(sql)
         if evento:
@@ -1909,9 +1913,15 @@ def create_diayhora_live():
                         """ 
                         id_dia = updateData(sql)
                         for h in d['horas']:
-                                horaini = h['ini']
+                                horaini = h['ini']      
+                                horaini = datetime.strptime(horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                                #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+                                utc = horaini.replace(tzinfo=from_zone)
+                                central = utc.astimezone(to_zone)
+
+
                                 sql = f"""
-                                INSERT INTO mn_date_horas ( hora, id_date_day) VALUES ( '{horaini}',
+                                INSERT INTO mn_date_horas ( hora, id_date_day) VALUES ( '{central}',
                                 '{id_dia}' ) 
                                 """ 
                                 id_hora = updateData(sql)
