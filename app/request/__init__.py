@@ -2357,10 +2357,14 @@ def get_datos_diayhora_by_id_encuesta():
                 #buscar cantidad de votos totales de la encuesta
                 sql2 = f"SELECT * FROM mn_date_horas_votos where id_tipo_encuesta = {id_encuesta}  "
                 votosTotales = getData(sql2)
+                #buscar cantidad de usuarios q han votado 
+                sql2 = f"SELECT count(DISTINCT id_user) as usuarios FROM `mn_date_horas_votos` where id_tipo_encuesta = '{id_encuesta}'  "
+                usuariosTotales = getDataOne(sql2)
                 response = {
                 'status':1,
                 'dias': diasyhoras,
-                'votosTotales': len(votosTotales)
+                'votosTotales': len(votosTotales), 
+                'usuariosTotales': usuariosTotales[0]
                 }
         else:
                 response = {
