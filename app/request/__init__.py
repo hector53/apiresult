@@ -869,6 +869,13 @@ def get_encuestas_event():
                                 'ganadores': ganadores, 
                                 'id_evento': id_evento
                                 })
+                        if tipo == 4:
+                                encuestaTipo.append( {
+                                 'tipo': tipo, 
+                                'idEcuesta': idEcuesta,
+                                'pregunta': pregunta,
+                                'id_evento': id_evento
+                                })
 
                                   
 
@@ -1262,6 +1269,48 @@ def get_encuestas_by_id_live():
                         "status": 1, 
                         "encuesta":  encuestaTipo, 
                         }
+                if en[1]==4:
+                        sql = f"SELECT * FROM mn_date_day where id_encuesta = '{id}' " 
+                        #buscar por uid las encuestas q tenga en la db 
+                        getDias = getData(sql)
+                        arrayDias = []
+                        arrayDate = []
+                        if getDias:
+                                for dia in getDias:
+                                        id_dia = dia[0]
+                                        #aqui buscar las horas del dia
+                                        sql = f"SELECT * FROM mn_date_horas where id_date_day = '{id_dia}' " 
+                                        #buscar por uid las encuestas q tenga en la db 
+                                        getHoras = getData(sql)
+                                        arrayHoras = []
+                                        for ho in getHoras:
+                                                id_hora = ho[0]
+                                                horaValue = ho[1]
+                                                arrayHoras.append({
+                                                'id': id_hora,
+                                                'ini': str(horaValue),
+                                                'fin': horaValue
+                                                })
+
+                                        arrayDias.append({
+                                        'id': dia[0],
+                                        'dia': str(dia[1]),
+                                        'horas': arrayHoras
+                                        })
+                                        
+                                        arrayDate.append(
+                                         str(dia[1])
+                                        )
+                        response = {
+                        "status": 1, 
+                        "encuesta":  encuestaTipo, 
+                        "dias": arrayDias, 
+                        "date": arrayDate
+                        }
+                        
+                        
+
+                
                 
         else:
                  response = {
@@ -1412,7 +1461,7 @@ def handle_join_room_event(data):
 def desconectar_user_modo_live_event(data):
         print(data)
         sql = f"""
-        delete from mn_clientes_conectados where id_room = '{request.sid}' 
+        delete from mn_clientes_conectados where codigo_evento = '{data['room']}' and id_user = '{data['username']}'
         """ 
         actualizar = updateData(sql)
         sql = f"SELECT * FROM mn_clientes_conectados where  codigo_evento = '{data['room']}'  " 
@@ -1605,7 +1654,7 @@ def delete_poll_simple_live_by_id():
                         actualizar = deleteData(sql)
 
                         sql = f"""
-                        DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id}' and id_user = '{id_user}'
+                        DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id}' 
                         """ 
                         actualizar = deleteData(sql)
                 if tipo == 2:
@@ -1616,6 +1665,21 @@ def delete_poll_simple_live_by_id():
                 if tipo == 3:
                         sql = f"""
                         DELETE FROM `mn_sorteos_participantes` WHERE  id_encuesta = '{id}'
+                        """ 
+                        actualizar = deleteData(sql)
+                if tipo == 4:
+                        sql = f"""
+                        DELETE FROM `mn_date_day` WHERE  id_encuesta = '{id}'
+                        """ 
+                        actualizar = deleteData(sql)
+                        
+                        sql = f"""
+                        DELETE FROM `mn_date_horas` WHERE  id_encuesta = '{id}'
+                        """ 
+                        actualizar = deleteData(sql)
+
+                        sql = f"""
+                        DELETE FROM `mn_date_horas_votos` WHERE  id_tipo_encuesta = '{id}'
                         """ 
                         actualizar = deleteData(sql)
                 
@@ -1922,8 +1986,8 @@ def create_diayhora_live():
                                 horaini = str(central)
 
                                 sql = f"""
-                                INSERT INTO mn_date_horas ( hora, id_date_day) VALUES ( '{horaini[:19]}',
-                                '{id_dia}' ) 
+                                INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{horaini[:19]}',
+                                '{id_dia}', '{id_tipo_encuesta}' ) 
                                 """ 
                                 id_hora = updateData(sql)
 
@@ -1956,6 +2020,168 @@ def create_diayhora_live():
 
         return jsonify(response)
 
+
+#editar encueta dia y hora
+@app.route('/api/edit_diayhora_live' , methods=['POST'])
+@jwt_required()
+def edit_diayhora_live():
+        body = request.get_json()
+        titulo = body["titulo"]
+        dias = body["dias"]
+        diasArray = json.loads(dias)
+        horas = body["horas"]
+        horasArray = json.loads(horas)
+        print(horasArray)
+        #cantidad de participantes 
+        codigo = body["codigo"]
+        activar = body["activar"]
+        id_tipo_encuesta = body["id_encuesta"]
+
+
+        id_user = get_jwt_identity()
+        # METHOD 1: Hardcode zones:
+        from_zone = tz.gettz('UTC')
+        to_zone = tz.gettz('America/Caracas')
+        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
+        evento = getDataOne(sql)
+        if evento:
+                id_evento = evento[0]
+                idsDiaNoBorrar = []
+                idsHoraNoBorrar = []
+                for d in horasArray:
+                        idDb = d['idDb']
+                        fechaDia = d['id']
+                        if idDb == 0:
+                                #inserto
+                                sql = f"""
+                                INSERT INTO mn_date_day ( fecha, id_encuesta) VALUES ( '{fechaDia}',
+                                '{id_tipo_encuesta}' ) 
+                                """ 
+                                id_dia = updateData(sql)
+                                idsDiaNoBorrar.append(id_dia)
+                                for h in d['horas']:
+                                        horaini = h['ini']      
+                                        horaini = datetime.strptime(horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                                        #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+                                        utc = horaini.replace(tzinfo=from_zone)
+                                        central = utc.astimezone(to_zone)
+                                        print(central)
+                                        horaini = str(central)
+
+                                        sql = f"""
+                                        INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{horaini[:19]}',
+                                        '{id_dia}', '{id_tipo_encuesta}' ) 
+                                        """ 
+                                        id_hora = updateData(sql)
+                                        idsHoraNoBorrar.append(id_hora)
+                        else:
+                                #editar 
+                                print("editar horas")
+                                idsDiaNoBorrar.append(idDb)
+                                for h in d['horas']:
+                                        idHoraDb = h['id'] 
+                                        if idHoraDb == 0: 
+                                                #inserto 
+                                                horaini = h['ini']      
+                                                horaini = datetime.strptime(horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                                                #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+                                                utc = horaini.replace(tzinfo=from_zone)
+                                                central = utc.astimezone(to_zone)
+                                                print(central)
+                                                horaini = str(central)
+
+                                                sql = f"""
+                                                INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{horaini[:19]}',
+                                                '{idDb}', '{id_tipo_encuesta}' ) 
+                                                """ 
+                                                id_hora = updateData(sql)
+                                                idsHoraNoBorrar.append(id_hora)
+                                        else:
+                                                print("editar hora")
+                                                #edito
+                                                horaini = h['ini']      
+                                                horaini = datetime.strptime(horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                                                #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+                                                utc = horaini.replace(tzinfo=from_zone)
+                                                central = utc.astimezone(to_zone)
+                                                print(central)
+                                                horaini = str(central)
+
+                                                sql = f"""
+                                                update mn_date_horas set hora = '{horaini[:19]}' where id = '{idHoraDb}' 
+                                                """ 
+                                                id_hora = updateData(sql)
+                                                idsHoraNoBorrar.append(idHoraDb)
+
+                #borrar los ids q no esten incluidos en el array de dias y horas 
+                #arrayT = [2,3,4,5,6]
+                notBorrar = ''
+                f=1
+
+                for t in idsDiaNoBorrar:
+                        if f==len(idsDiaNoBorrar):
+                                notBorrar = notBorrar + str(t)
+                        else:
+                                notBorrar = notBorrar + str(t) + ','
+                        f=f+1
+                
+                sql = f"""
+                delete from mn_date_day where id not in ({notBorrar}) and id_encuesta = '{id_tipo_encuesta}'
+                """ 
+                print(sql)
+                borrarSobrantes = updateData(sql)
+
+                notBorrar = ''
+                f=1
+
+                for t in idsHoraNoBorrar:
+                        if f==len(idsHoraNoBorrar):
+                                notBorrar = notBorrar + str(t)
+                        else:
+                                notBorrar = notBorrar + str(t) + ','
+                        f=f+1
+                
+                sql = f"""
+                delete from mn_date_horas where id not in ({notBorrar}) and id_encuesta = '{id_tipo_encuesta}'
+                """ 
+                print(sql)
+                borrarSobrantes = updateData(sql)
+
+                sql = f"""
+                delete from mn_date_horas_votos where id_date_hora not in ({notBorrar}) and id_tipo_encuesta = '{id_tipo_encuesta}'
+                """ 
+                print(sql)
+                borrarSobrantes = updateData(sql)
+                                        
+
+                if activar == 1:
+                        sql = f"""
+                        update mn_eventos set modo = 1, status = 1 where 
+                        id = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        eventoUpdate = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 0 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' 
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        sql = f"""
+                        update mn_tipo_encuesta set play = 1 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
+                        """ 
+                        tipoEncuesta = updateData(sql)
+                        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_tipo_encuesta})
+                
+                response = {
+                'status': 1, 
+                'id': id_tipo_encuesta, 
+                }
+        else: 
+                response = {
+                'status': 0
+                }
+
+        return jsonify(response)
 
 @app.route('/api/get_respuestas_by_user_nube_palabras' , methods=["GET"])
 def get_respuestas_by_user_nube_palabras():
