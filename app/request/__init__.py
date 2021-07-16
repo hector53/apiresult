@@ -159,8 +159,9 @@ def create_diayhora_not_user():
         miCodigo = codigoAleatorio(5)
         cookieNotUser = body["cookieNotUser"]
         ipWeb = body["ipWeb"]
+        zonaHoraria = body["zonaHoraria"]
         from_zone = tz.gettz('UTC')
-        to_zone = tz.gettz('America/Caracas')
+        to_zone = tz.gettz(zonaHoraria)
         #consultar si el usuario existe sino guardarlo 
         sql = f"SELECT * FROM mn_users_cookie where cookie = '{cookieNotUser}' " 
         getUser = getDataOne(sql)
@@ -2018,8 +2019,9 @@ def create_diayhora_live():
         activar = body["activar"]
         id_user = get_jwt_identity()
         # METHOD 1: Hardcode zones:
+        zonaHoraria = body["zonaHoraria"]
         from_zone = tz.gettz('UTC')
-        to_zone = tz.gettz('America/Caracas')
+        to_zone = tz.gettz(zonaHoraria)
         sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  " 
         evento = getDataOne(sql)
         if evento:
