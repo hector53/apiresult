@@ -147,7 +147,76 @@ def create_poll_not_user():
     return jsonify(response)
 
 
+#encuesta dia y hora modo not user 
+@app.route('/api/create_diayhora_not_user' , methods=['POST'])
+def create_diayhora_not_user():
+        body = request.get_json()
+        print(body)
+        titulo = body["titulo"]
+        dias = body["dias"]
+        horas = body["horas"]
+        horasArray = json.loads(horas)
+        miCodigo = codigoAleatorio(5)
+        cookieNotUser = body["cookieNotUser"]
+        ipWeb = body["ipWeb"]
+        from_zone = tz.gettz('UTC')
+        to_zone = tz.gettz('America/Caracas')
+        #consultar si el usuario existe sino guardarlo 
+        sql = f"SELECT * FROM mn_users_cookie where cookie = '{cookieNotUser}' " 
+        getUser = getDataOne(sql)
+        if getUser:
+                print("ya existe")
+        else:
+                #guardarlo
+                sql = f"""
+                INSERT INTO mn_users_cookie ( name, ip, cookie, fecha) VALUES ( 'guest',
+                '{ipWeb}', '{cookieNotUser}', '{datetime.now()}'  ) 
+                """ 
+                id_user = updateData(sql)
 
+
+
+
+        sql = f"""
+        INSERT INTO mn_eventos ( titulo, descripcion, codigo, id_user, modo, tipoUser, status, fecha) VALUES ( '{titulo}',
+        '', '{miCodigo}', '{cookieNotUser}', 0, 0, 1,  '{datetime.now()}'  ) 
+        """ 
+        id_evento = updateData(sql)
+        sql = f"""
+        INSERT INTO mn_tipo_encuesta ( tipo, titulo, id_user, id_evento, fecha) VALUES ( 4,
+        '{titulo}', '{cookieNotUser}', '{id_evento}',  '{datetime.now()}'  ) 
+        """ 
+        id_tipo_encuesta = updateData(sql)
+
+        for d in horasArray:
+                        fechaDia = d['id']
+                        sql = f"""
+                        INSERT INTO mn_date_day ( fecha, id_encuesta) VALUES ( '{fechaDia}',
+                        '{id_tipo_encuesta}' ) 
+                        """ 
+                        id_dia = updateData(sql)
+                        for h in d['horas']:
+                                horaini = h['ini']      
+                                horaini = datetime.strptime(horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                                #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+                                utc = horaini.replace(tzinfo=from_zone)
+                                central = utc.astimezone(to_zone)
+                                print(central)
+                                horaini = str(central)
+
+                                sql = f"""
+                                INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{horaini[:19]}',
+                                '{id_dia}', '{id_tipo_encuesta}' ) 
+                                """ 
+                                id_hora = updateData(sql)
+
+
+
+        response = {
+        'codigo': miCodigo,
+        'status': 1
+        }
+        return jsonify(response)
   
 @app.route('/api/me' , methods=['GET'])
 def getUser():
