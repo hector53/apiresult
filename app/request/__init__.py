@@ -671,7 +671,7 @@ def crear_evento():
                 sql = f"""
                 INSERT INTO mn_eventos ( titulo, descripcion, codigo, id_user, modo, tipoUser,  status, fecha) 
                 VALUES 
-                ( '{titulo}', '{descripcion}', '{codigo}', '{id_user}', 0, 1, 0, '{datetime.now()}'  ) 
+                ( '{titulo}', '{descripcion}', '{codigo}', '{id_user}', 0, 1, 1, '{datetime.now()}'  ) 
                 """ 
                 id_evento = updateData(sql)
 
