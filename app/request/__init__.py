@@ -2785,6 +2785,8 @@ def add_qya_live_front():
         if modoLive==1:
                 print("cambo de encuesta aiadjsouasdoisadhsadijsadihijlsadd")
                 socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
+        else:
+                socketio.emit('cambioDeEncuesta', { "tipo": 6, "tipoEncuesta": 5, "msj": "actualizar encuesta modo normal", "codigo":codigo, "id_encuesta": id_encuesta})
         socketio.emit('respuestaDelVoto', { "tipo": 5, "id_evento":id_evento, "msj": "Nueva pregunta", "id_encuesta": id_encuesta})
 
         response = {
@@ -2837,6 +2839,8 @@ def delete_qya_live_admin():
         codigo = body["codigo"]
         id_user = body["p"]
         idP = body["idP"]
+        modoLive=  body["liveMode"]
+        
 
         #buscar la pregunta pra ver si es del usuario 
         sql2 = f"SELECT * FROM mn_tipo_encuesta where id = {id_encuesta} and id_evento = '{id_evento}' and id_user = '{id_user}'  "
@@ -2855,7 +2859,11 @@ def delete_qya_live_admin():
                 'status': 1
                 }
                 
-                socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
+                if modoLive==1:
+                        print("cambo de encuesta aiadjsouasdoisadhsadijsadihijlsadd")
+                        socketio.emit('cambioDeEncuesta', { "tipo": 1, "msj": "cambia encuesta", "codigo":codigo, "id_encuesta": id_encuesta})
+                else:
+                        socketio.emit('cambioDeEncuesta', { "tipo": 6, "tipoEncuesta": 5, "msj": "actualizar encuesta modo normal", "codigo":codigo, "id_encuesta": id_encuesta})
                 socketio.emit('respuestaDelVoto', { "tipo": 5, "id_evento":id_evento, "msj": "borre una pregunta", "id_encuesta": id_encuesta})
         else:
                 response = {
