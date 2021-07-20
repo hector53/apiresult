@@ -807,7 +807,7 @@ def guardar_pregunta_tipo_2():
         return jsonify(response)
 
 
-@app.route('/api/guardar_pregunta_tipo_2' , methods=["POST"])
+@app.route('/api/guardar_pregunta_tipo_5' , methods=["POST"])
 @jwt_required()
 def guardar_pregunta_tipo_5():  
         print("llegue aqui")
