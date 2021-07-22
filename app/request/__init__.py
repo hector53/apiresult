@@ -681,7 +681,7 @@ def modo_live_evento_encuesta_activa():
         """
     tipoEncuesta = updateData(sql)
     socketio.emit('cambioDeEncuesta', {
-                  "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": idEncuesta})
+                  "tipo": 7, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": idEncuesta})
     response = {
         'status': 1
     }
