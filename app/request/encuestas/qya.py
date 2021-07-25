@@ -52,8 +52,11 @@ def create_poll_qya_live():
                         id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
                         """
             tipoEncuesta = updateData(sql)
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_tipo_encuesta})
+            socketio.emit('CrearEncuestayActivar', {
+                           "msj": "crearon una encuesta y la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
+        else:
+            socketio.emit('GuardarEncuesta', {
+            "msj": "crearon una encuesta, la guardaron pero no la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
         response = {
             'status': 1
         }
@@ -144,12 +147,12 @@ def add_qya_live_front():
     if modoLive == 1:
         print("cambo de encuesta aiadjsouasdoisadhsadijsadihijlsadd")
         socketio.emit('cambioDeEncuesta', {
-                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
     else:
         socketio.emit('cambioDeEncuesta', {
-                      "tipo": 6, "tipoEncuesta": 5, "msj": "actualizar encuesta modo normal", "codigo": codigo, "id_encuesta": id_encuesta})
+                      "tipo": 6, "tipoEncuesta": 5, "msj": "actualizar encuesta modo normal", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
     socketio.emit('respuestaDelVoto', {
-                  "tipo": 5, "id_evento": id_evento, "msj": "Nueva pregunta", "id_encuesta": id_encuesta})
+                  "tipo": 5, "id_evento": id_evento, "msj": "Nueva pregunta", "id_encuesta": id_encuesta}, to=codigo)
 
     response = {
         'status': id_qya
@@ -159,6 +162,65 @@ def add_qya_live_front():
 
 
 
+# edit qya live
+@app.route('/api/edit_qya_live_modal', methods=['POST'])
+@jwt_required()
+def edit_qya_live_modal():
+    body = request.get_json()
+    print(body)
+    pregunta = body["pregunta"]
+    codigo = body["codigo"]
+    modo = body["modo"]
+    id = body["id"]
+    activar = body["activar"]
+    id_user = get_jwt_identity()
+    sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
+    evento = getDataOne(sql)
+    if evento:
+        id_evento = evento[0]
+        sql = f"""
+        update mn_tipo_encuesta set titulo = '{pregunta}' where 
+        id = '{id}' and id_user = '{id_user}' 
+        """
+        tipoEncuesta = updateData(sql)
+
+        sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' and id = '{id}'  "
+        encuestaById = getDataOne(sql)
+        playEncuesta = encuestaById[6]
+      
+
+        if modo == 1:
+            
+            if activar == 1:
+                sql = f"""
+                            update mn_eventos set modo = 1, status = 1 where 
+                            id = '{id_evento}' and id_user = '{id_user}' 
+                            """
+                eventoUpdate = updateData(sql)
+                sql = f"""
+                            update mn_tipo_encuesta set play = 0 where 
+                            id_evento = '{id_evento}' and id_user = '{id_user}' 
+                            """
+                tipoEncuesta = updateData(sql)
+                sql = f"""
+                            update mn_tipo_encuesta set play = 1 where 
+                            id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id}'
+                            """
+                tipoEncuesta = updateData(sql)
+                socketio.emit('CrearEncuestayActivar', {
+                                "msj": "crearon una encuesta y la activaron", "codigo": codigo, "id_encuesta": id}, to=codigo)
+            else:
+                socketio.emit('GuardarEncuesta', {"msj": "crearon una encuesta la guardaron pero no la activaron", "codigo": codigo, "id_encuesta": id}, to=codigo)
+                if playEncuesta==1:
+                    socketio.emit('cambioDeEncuesta', {"msj": "editaron la encuesta activa", "codigo": codigo, "id_encuesta": id}, to=codigo)
+    
+    
+    
+    response = {
+        'status': 1,
+    }
+
+    return jsonify(response)
 
 # edit question qya front
 @app.route('/api/edit_qya_live_front', methods=['POST'])
@@ -185,9 +247,9 @@ def edit_qya_live_front():
         }
         if modoLive == 1:
             socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
         socketio.emit('respuestaDelVoto', {
-                      "tipo": 5, "id_evento": id_evento, "msj": "Nueva pregunta", "id_encuesta": id_encuesta})
+                      "tipo": 5, "id_evento": id_evento, "msj": "Nueva pregunta", "id_encuesta": id_encuesta}, to=codigo)
     else:
         response = {
             'status': 0
@@ -226,12 +288,12 @@ def delete_qya_live_admin():
         if modoLive == 1:
             print("cambo de encuesta aiadjsouasdoisadhsadijsadihijlsadd")
             socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
         else:
             socketio.emit('cambioDeEncuesta', {
-                          "tipo": 6, "tipoEncuesta": 5, "msj": "actualizar encuesta modo normal", "codigo": codigo, "id_encuesta": id_encuesta})
+                          "tipo": 6, "tipoEncuesta": 5, "msj": "actualizar encuesta modo normal", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
         socketio.emit('respuestaDelVoto', {
-                      "tipo": 5, "id_evento": id_evento, "msj": "borre una pregunta", "id_encuesta": id_encuesta})
+                      "tipo": 5, "id_evento": id_evento, "msj": "borre una pregunta", "id_encuesta": id_encuesta}, to=codigo)
     else:
         response = {
             'status': 0
@@ -268,9 +330,9 @@ def delete_qya_live_user():
         }
         if modoLive == 1:
             socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
         socketio.emit('respuestaDelVoto', {
-                      "tipo": 5, "id_evento": id_evento, "msj": "borre una pregunta", "id_encuesta": id_encuesta})
+                      "tipo": 5, "id_evento": id_evento, "msj": "borre una pregunta", "id_encuesta": id_encuesta}, to=codigo)
     else:
         response = {
             'status': 0
@@ -328,9 +390,9 @@ def like_encuesta_qya_front():
 
     if modoLive == 1:
         socketio.emit('cambioDeEncuesta', {
-                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
     socketio.emit('respuestaDelVoto', {
-                  "tipo": 5, "id_evento": id_evento, "msj": "Nueva voto en hora", "id_encuesta": id_encuesta})
+                  "tipo": 5, "id_evento": id_evento, "msj": "Nueva voto en hora", "id_encuesta": id_encuesta}, to=codigo)
 
     return jsonify(response)
 

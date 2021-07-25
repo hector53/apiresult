@@ -5,6 +5,7 @@ from app.schemas import *
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 import random
+import json
 from app.request.funciones import *
 
 # create sorteo live
@@ -63,8 +64,11 @@ def create_sorteo_live():
                         id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
                         """
             tipoEncuesta = updateData(sql)
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_tipo_encuesta})
+            socketio.emit('CrearEncuestayActivar', {
+                           "msj": "crearon una encuesta y la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
+        else:
+            socketio.emit('GuardarEncuesta', {
+            "msj": "crearon una encuesta, la guardaron pero no la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
 
         # buscar participantes
         sql2 = f"SELECT * FROM mn_sorteos_participantes where id_encuesta = {id_tipo_encuesta}  "
@@ -147,17 +151,21 @@ def edit_sorteo_live_modal():
             tipoEncuesta = updateData(sql)
             sql = f"""
                         update mn_tipo_encuesta set play = 1 where 
-                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
+                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_encuesta}'
                         """
             tipoEncuesta = updateData(sql)
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_tipo_encuesta})
+            socketio.emit('CrearEncuestayActivar', {
+                           "msj": "crearon una encuesta y la activaron", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
+        else:
+            socketio.emit('GuardarEncuesta', {
+            "msj": "crearon una encuesta, la guardaron pero no la activaron", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
 
-        sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id = '{id_encuesta}' and play = 1  "
-        tipoE = getDataOne(sql)
-        if tipoE:
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_tipo_encuesta})
+            sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id = '{id_encuesta}' and play = 1  "
+            tipoE = getDataOne(sql)
+            if tipoE:
+                socketio.emit('cambioDeEncuesta', {  "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
+
+        
 
         response = {
             'status': 1,
@@ -227,7 +235,7 @@ def sortear_sorteo_live():
             guardarGanador = updateData(sql)
 
     socketio.emit('generarGanadorSorteo', {
-                  "ganadores": ganadores, "msj": "generando ganadores", "codigo": codigo, "id_encuesta": id_encuesta})
+                  "ganadores": ganadores, "msj": "generando ganadores", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
 
     response = {
         'status': 1,

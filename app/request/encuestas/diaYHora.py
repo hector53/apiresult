@@ -159,8 +159,11 @@ def create_diayhora_live():
                         id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
                         """
             tipoEncuesta = updateData(sql)
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_tipo_encuesta})
+            socketio.emit('CrearEncuestayActivar', {
+                           "msj": "crearon una encuesta y la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
+        else:
+            socketio.emit('GuardarEncuesta', {
+            "msj": "crearon una encuesta, la guardaron pero no la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
 
         response = {
             'status': 1,
@@ -308,6 +311,20 @@ def edit_diayhora_live():
         print(sql)
         borrarSobrantes = updateData(sql)
 
+        sql = f"SELECT * FROM mn_tipo_encuesta where  id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}' "
+        tipoEncuesta = getDataOne(sql)
+        playEncuesta = tipoEncuesta[6]
+
+        sql = f"""
+        update mn_tipo_encuesta set titulo = '{titulo}' where 
+        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
+        """
+        tipoEncuesta = updateData(sql)
+
+
+
+        
+
         if activar == 1:
             sql = f"""
                         update mn_eventos set modo = 1, status = 1 where 
@@ -324,8 +341,15 @@ def edit_diayhora_live():
                         id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
                         """
             tipoEncuesta = updateData(sql)
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_tipo_encuesta})
+            socketio.emit('CrearEncuestayActivar', {
+                           "msj": "crearon una encuesta y la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
+        else:
+            socketio.emit('GuardarEncuesta', {
+            "msj": "crearon una encuesta, la guardaron pero no la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
+
+            if playEncuesta==1:
+                socketio.emit('cambioDeEncuesta', {
+                       "msj": "editaron la encuesta activa", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
 
         response = {
             'status': 1,
@@ -532,9 +556,9 @@ def votar_encuesta_dia_y_hora_front():
 
     if modoLive == 1:
         socketio.emit('cambioDeEncuesta', {
-                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
     socketio.emit('respuestaDelVoto', {
-                  "tipo": 4, "id_evento": id_evento, "msj": "Nueva voto en hora", "id_encuesta": id_encuesta})
+                  "tipo": 4, "id_evento": id_evento, "msj": "Nueva voto en hora", "id_encuesta": id_encuesta}, to=codigo)
 
     return jsonify(response)
 

@@ -17,10 +17,30 @@ from app.request.encuestas.nubeDePalabras import *
 from app.request.encuestas.sorteos import *
 from app.request.encuestas.diaYHora import *
 from app.request.encuestas.qya import *
+from app.request.socketRequest import *
 
-clientes = []
+users = []
 mesFecha = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
             "Oct", "Nov", "Dic"]
+
+
+def userJoin(id, username, room):
+    global users
+    user = { id, username, room }
+    users.append(user)
+    return user
+
+def getCurrentUser(id):
+    global users
+    return next(x for x in users if x["id"] == id )
+
+
+
+
+
+
+
+
 
 
 
@@ -582,11 +602,11 @@ def publicar_evento():
     id_user = get_jwt_identity()
     codigo = body["codigo"]
     sql = f"""
-        update mn_eventos set status = '{status}' where 
+        update mn_eventos set status = '{status}', modo = 0 where 
         codigo = '{codigo}' and id_user = '{id_user}'
         """
     evento = updateData(sql)
-    socketio.emit('cambiarStatusEvent', {"codigo": codigo, "status": status})
+    socketio.emit('cambiarStatusEvent', {"codigo": codigo, "status": status}, to=codigo)
     response = {
         'status': 1
     }
@@ -642,7 +662,7 @@ def modo_live_evento():
         tipoEncuesta = updateData(sql)
 
     socketio.emit('activarModoPresentacion', {
-                  "codigo": codigo, "modo": modoLive})
+                  "codigo": codigo, "modo": modoLive}, to=codigo)
     response = {
         'status': 1
     }
@@ -680,8 +700,8 @@ def modo_live_evento_encuesta_activa():
         id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{idEncuesta}'
         """
     tipoEncuesta = updateData(sql)
-    socketio.emit('cambioDeEncuesta', {
-                  "tipo": 7, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": idEncuesta})
+    socketio.emit('cambiarEncuestaActiva', {
+                   "msj": "cambiando de encuesta activa", "codigo": codigo, "id_encuesta": idEncuesta}, to=codigo)
     response = {
         'status': 1
     }
@@ -710,14 +730,18 @@ def get_encuesta_event_live():
                 'posicion': en[3],
                 'play': en[6]
             })
-        response = {
-            "status": 1,
-            "id":  evento[0],
-            "titulo": evento[1],
-            "statusEvent": evento[7],
-            "modo": evento[5],
-            "tipoEncuesta": encuestaTipo,
-        }
+            response = {
+                "status": 1,
+                "id":  evento[0],
+                "titulo": evento[1],
+                "statusEvent": evento[7],
+                "modo": evento[5],
+                "tipoEncuesta": encuestaTipo,
+            }
+        else:
+            response = {
+                "status": 0,
+            }
     else:
         response = {
             "status": 0,
@@ -773,6 +797,12 @@ def get_encuestas_by_id_live():
                 "opciones": opcionesData,
             }
         if en[1] == 2:
+            response = {
+                "status": 1,
+                "encuesta":  encuestaTipo,
+            }
+
+        if en[1] == 5:
             response = {
                 "status": 1,
                 "encuesta":  encuestaTipo,
@@ -964,8 +994,17 @@ def get_event_by_cod():
                 "encuestaActiva": play
             }
         else:
+            #pasar el evento a stop 
+            """
+            sql = f"""
+            #update mn_eventos set modo = 0 where id = '{id_evento}'
+            """
+            updateEvento = updateData(sql)
+            """
             response = {
-                "status": 2
+                "status": 2,
+                "statusEvent": evento[7],
+                "modo": evento[5],
             }
     else:
         response = {
@@ -974,152 +1013,6 @@ def get_event_by_cod():
 
     return jsonify(response)
 
-
-# sockets
-@socketio.on('conectar')
-def handle_join_room_event(data):
-    socketId = rooms()
-    print("id de usuario conectado", socketId)
-    print("hola q tal estoy en el socket conectar")
-    # aqui guardar en la db el cliente conectado
-    sql = f"SELECT * FROM mn_clientes_conectados where id_user = '{data['username']}' and codigo_evento = '{data['room']}'  "
-    cliente = getDataOne(sql)
-    if cliente:
-        print("ya esta conectado")
-    else:
-        # buscar si el dueño del evento para no sumarlo
-        sql = f"SELECT * FROM mn_eventos where id_user = '{data['username']}' and codigo = '{data['room']}'  "
-        adminEvento = getDataOne(sql)
-        if adminEvento:
-            print("no guardar")
-        else:
-            sql = f"""
-                        INSERT INTO mn_clientes_conectados ( id_room, codigo_evento, id_user) VALUES ( '{socketId[0]}',
-                        '{data['room']}', '{data['username']}' ) 
-                        """
-            actualizar = updateData(sql)
-
-    app.logger.info("{} has joined the room {}".format(
-        data['username'], data['room']))
-    join_room(data['room'])
-    # en este emit debo enviar las personas conectadas al evento
-    sql = f"SELECT * FROM mn_clientes_conectados where  codigo_evento = '{data['room']}'  "
-    clientes = getData(sql)
-    conectados = len(clientes)
-    socketio.emit('join_room_announcement', {
-                  'username': data['username'], 'codigo': data['room'], 'conectados': conectados})
-    print("emiti el socket")
-
-
-@socketio.on('desconectar')
-def desconectar_user_modo_live_event(data):
-    print(data)
-    sql = f"""
-        delete from mn_clientes_conectados where codigo_evento = '{data['room']}' and id_user = '{data['username']}'
-        """
-    actualizar = updateData(sql)
-    sql = f"SELECT * FROM mn_clientes_conectados where  codigo_evento = '{data['room']}'  "
-    clientes = getData(sql)
-    conectados = len(clientes)
-    socketio.emit('join_room_disconect', {
-                  'username': data['username'], 'codigo': data['room'], 'conectados': conectados})
-    print('Client disconnected', request.sid)
-
-# create poll simple modo live
-
-
-@app.route('/api/create_poll_simple_live', methods=['POST'])
-@jwt_required()
-def create_poll_simple_live():
-    body = request.get_json()
-    print(body)
-    pregunta = body["pregunta"]
-    opciones = body["opciones"]
-    codigo = body["codigo"]
-    activar = body["activar"]
-    id_user = get_jwt_identity()
-    multiple = body["multiple"]
-    print("multiple", multiple)
-    sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
-    evento = getDataOne(sql)
-    if evento:
-        id_evento = evento[0]
-        # necesito saber la posicion de la ultima encuesta
-        sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion desc "
-        # buscar por uid las encuestas q tenga en la db
-        enPosicion = getDataOne(sql)
-        if enPosicion:
-            posicion = enPosicion[3]+1
-        else:
-            posicion = 0+1
-        sql = f"""
-                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, extra, fecha) VALUES ( 1,
-                '{pregunta}', '{posicion}', '{id_user}', '{id_evento}', '{multiple}', '{datetime.now()}'  ) 
-                """
-        id_tipo_encuesta = updateData(sql)
-
-        for opcion in opciones:
-            sql = f"""
-                        INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{opcion}',
-                        '{id_tipo_encuesta}' ) 
-                        """
-            actualizar = updateData(sql)
-        if activar == 1:
-            sql = f"""
-                        update mn_eventos set modo = 1, status = 1 where 
-                        id = '{id_evento}' and id_user = '{id_user}' 
-                        """
-            eventoUpdate = updateData(sql)
-            sql = f"""
-                        update mn_tipo_encuesta set play = 0 where 
-                        id_evento = '{id_evento}' and id_user = '{id_user}' 
-                        """
-            tipoEncuesta = updateData(sql)
-            sql = f"""
-                        update mn_tipo_encuesta set play = 1 where 
-                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
-                        """
-            tipoEncuesta = updateData(sql)
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_tipo_encuesta})
-        response = {
-            'status': 1
-        }
-    else:
-        response = {
-            'status': 0
-        }
-
-    return jsonify(response)
-
-
-
-
-
-
-@app.route('/api/delete_poll_simple_live', methods=["POST"])
-@jwt_required()
-def delete_poll_simple_live():
-    body = request.get_json()
-    id = body["id"]
-    id_opcion = body["id_opcion"]
-    id_user = get_jwt_identity()
-    print("id de la encuesta", id)
-    print("id de la opcion", id_opcion)
-    sql = f"""
-        DELETE FROM `mn_tipo_encuesta_choice` WHERE  id_tipo_encuesta = '{id}' and id = '{id_opcion}' 
-                """
-    actualizar = deleteData(sql)
-
-    sql = f"""
-        DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id}' and id_opcion = '{id_opcion}'
-                """
-    actualizar = deleteData(sql)
-
-    response = {
-        'status': actualizar,
-    }
-    return jsonify(response)
 
 
 @app.route('/api/delete_poll_simple_live_by_id', methods=["POST"])
@@ -1131,9 +1024,12 @@ def delete_poll_simple_live_by_id():
     id_user = get_jwt_identity()
     sql = f"SELECT * FROM mn_tipo_encuesta where id = '{id}' and id_user = '{id_user}'  "
     buscarTipo = getDataOne(sql)
+    encuestaActiva = 0
     tipo = 0
     if buscarTipo:
+
         tipo = buscarTipo[1]
+        encuestaActiva = buscarTipo[6]
         sql = f"""
                 DELETE FROM `mn_tipo_encuesta` WHERE  id = '{id}' and id_user = '{id_user}'
                 """
@@ -1174,27 +1070,27 @@ def delete_poll_simple_live_by_id():
                         """
             actualizar = deleteData(sql)
 
-        # buscar si quedan encuestas y poner activa la primera
-        sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
-        evento = getDataOne(sql)
-        if evento:
-            id_evento = evento[0]
-            # buscar encuestas del evento
-            sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id_user = '{id_user}' order by posicion asc "
-            misencuestas = getDataOne(sql)
-            print(misencuestas)
-            if misencuestas:
-                id_encuesta_primera = misencuestas[0]
-                # update
-                sql = f"""
-                                update  mn_tipo_encuesta set play = 1 where id = '{id_encuesta_primera}'  
-                                """
-                actualizar = deleteData(sql)
-                socketio.emit('cambioDeEncuesta', {
-                              "tipo": 3, "msj": "elimine una encuesta", "codigo": codigo, "id_encuesta": id_encuesta_primera})
-            else:
-                socketio.emit('cambioDeEncuesta', {
-                              "tipo": 5, "msj": "sin encuestas", "codigo": codigo})
+        if encuestaActiva == 1:
+            # buscar si quedan encuestas y poner activa la primera
+            sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
+            evento = getDataOne(sql)
+            if evento:
+                id_evento = evento[0]
+                # buscar encuestas del evento
+                sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id_user = '{id_user}' order by posicion asc "
+                misencuestas = getDataOne(sql)
+                print(misencuestas)
+                if misencuestas:
+                    id_encuesta_primera = misencuestas[0]
+                    # update
+                    sql = f"""
+                                    update  mn_tipo_encuesta set play = 1 where id = '{id_encuesta_primera}'  
+                                    """
+                    actualizar = deleteData(sql)
+                    socketio.emit('EliminarEncuestaActiva', {
+                                "tipo": 3, "msj": "elimine una encuesta", "codigo": codigo, "id_encuesta": id_encuesta_primera}, to=codigo)
+                else:
+                    socketio.emit('sinEncuestasAlEliminar', { "msj": "sin encuestas", "codigo": codigo}, to=codigo)
 
         response = {
             'status': actualizar,

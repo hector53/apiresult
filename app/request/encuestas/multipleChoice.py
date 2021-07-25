@@ -6,6 +6,108 @@ from flask_jwt_extended import  jwt_required, get_jwt_identity
 from datetime import datetime
 from app.request.funciones import *
 
+
+# create poll simple modo live
+
+
+@app.route('/api/create_poll_simple_live', methods=['POST'])
+@jwt_required()
+def create_poll_simple_live():
+    body = request.get_json()
+    print(body)
+    pregunta = body["pregunta"]
+    opciones = body["opciones"]
+    codigo = body["codigo"]
+    activar = body["activar"]
+    id_user = get_jwt_identity()
+    multiple = body["multiple"]
+    print("multiple", multiple)
+    sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
+    evento = getDataOne(sql)
+    if evento:
+        id_evento = evento[0]
+        # necesito saber la posicion de la ultima encuesta
+        sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion desc "
+        # buscar por uid las encuestas q tenga en la db
+        enPosicion = getDataOne(sql)
+        if enPosicion:
+            posicion = enPosicion[3]+1
+        else:
+            posicion = 0+1
+        sql = f"""
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, extra, fecha) VALUES ( 1,
+                '{pregunta}', '{posicion}', '{id_user}', '{id_evento}', '{multiple}', '{datetime.now()}'  ) 
+                """
+        id_tipo_encuesta = updateData(sql)
+
+        for opcion in opciones:
+            sql = f"""
+                        INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{opcion}',
+                        '{id_tipo_encuesta}' ) 
+                        """
+            actualizar = updateData(sql)
+        if activar == 1:
+            sql = f"""
+                        update mn_eventos set modo = 1, status = 1 where 
+                        id = '{id_evento}' and id_user = '{id_user}' 
+                        """
+            eventoUpdate = updateData(sql)
+            sql = f"""
+                        update mn_tipo_encuesta set play = 0 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' 
+                        """
+            tipoEncuesta = updateData(sql)
+            sql = f"""
+                        update mn_tipo_encuesta set play = 1 where 
+                        id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
+                        """
+            tipoEncuesta = updateData(sql)
+            socketio.emit('CrearEncuestayActivar', {
+                           "msj": "crearon una encuesta y la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
+        else:
+            socketio.emit('GuardarEncuesta', {
+            "msj": "crearon una encuesta, la guardaron pero no la activaron", "codigo": codigo, "id_encuesta": id_tipo_encuesta}, to=codigo)
+        response = {
+            'status': 1
+        }
+    else:
+        response = {
+            'status': 0
+        }
+
+    return jsonify(response)
+
+
+
+
+
+
+@app.route('/api/delete_poll_simple_live', methods=["POST"])
+@jwt_required()
+def delete_poll_simple_live():
+    body = request.get_json()
+    id = body["id"]
+    id_opcion = body["id_opcion"]
+    id_user = get_jwt_identity()
+    print("id de la encuesta", id)
+    print("id de la opcion", id_opcion)
+    sql = f"""
+        DELETE FROM `mn_tipo_encuesta_choice` WHERE  id_tipo_encuesta = '{id}' and id = '{id_opcion}' 
+                """
+    actualizar = deleteData(sql)
+
+    sql = f"""
+        DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id}' and id_opcion = '{id_opcion}'
+                """
+    actualizar = deleteData(sql)
+
+    response = {
+        'status': actualizar,
+    }
+    return jsonify(response)
+
+
+
 @app.route('/api/create_poll_not_user', methods=['POST'])
 def create_poll_not_user():
     body = request.get_json()
@@ -102,9 +204,9 @@ def votar_encuesta():
             if actualizar:
                 if modoLive == 1:
                     socketio.emit('cambioDeEncuesta', {
-                                  "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                                  "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
                 socketio.emit('respuestaDelVoto', {
-                              "tipo": 1, "id_evento": id_evento, "msj": "votaste", "id_encuesta": id_encuesta})
+                              "tipo": 1, "id_evento": id_evento, "msj": "votaste", "id_encuesta": id_encuesta}, to=codigo)
                 return jsonify(result=status)
             else:
                 return jsonify(result=3)
@@ -132,9 +234,9 @@ def votar_encuesta():
             if actualizar:
                 if modoLive == 1:
                     socketio.emit('cambioDeEncuesta', {
-                                  "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                                  "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
                 socketio.emit('respuestaDelVoto', {
-                              "tipo": 1, "id_evento": id_evento, "msj": "votaste", "id_encuesta": id_encuesta})
+                              "tipo": 1, "id_evento": id_evento, "msj": "votaste", "id_encuesta": id_encuesta}, to=codigo)
                 return jsonify(result=status)
             else:
                 return jsonify(result=3)
@@ -213,9 +315,9 @@ def cancelar_voto():
     if modoLive == '1':
         print("llegue a emitir el cancelar voto")
         socketio.emit('cambioDeEncuesta', {
-                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta})
+                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
     socketio.emit('respuestaDelVoto', {
-                  "tipo": 1, "id_evento": id_evento, "msj": "cancelo voto", "id_encuesta": id_encuesta})
+                  "tipo": 1, "id_evento": id_evento, "msj": "cancelo voto", "id_encuesta": id_encuesta}, to=codigo)
     return jsonify(response)
 
 #get multiple choice by id encuesta
@@ -470,31 +572,62 @@ def edit_poll_simple_live():
     codigo = body["codigo"]
     multiple = body["multiple"]
     id = body["id"]
+    activar = body["activar"]
     opcionesNueva = body["opcionesNueva"]
     id_user = get_jwt_identity()
-    sql = f"""
+    sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
+    evento = getDataOne(sql)
+    if evento:
+        id_evento = evento[0]
+            
+        sql = f"""
         update mn_tipo_encuesta set titulo = '{pregunta}', extra = '{multiple}' where 
         id = '{id}' and id_user = '{id_user}' 
         """
-    tipoEncuesta = updateData(sql)
-    for op in opciones:
-        opcionTexto = op["opcion"]
-        opcionId = op["id"]
-        sql = f"""
-                        update mn_tipo_encuesta_choice set opcion = '{opcionTexto}' where id = '{opcionId}' and id_tipo_encuesta = '{id}' 
-                                """
-        actualizar = updateData(sql)
-    # ahora insertar las nuevas
-    for op2 in opcionesNueva:
-        sql = f"""
-                INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{op2}',
-                '{id}' ) 
-                """
-        actualizar = updateData(sql)
+        tipoEncuesta = updateData(sql)
+        for op in opciones:
+            opcionTexto = op["opcion"]
+            opcionId = op["id"]
+            sql = f"""
+            update mn_tipo_encuesta_choice set opcion = '{opcionTexto}' where id = '{opcionId}' and id_tipo_encuesta = '{id}' 
+            """
+            actualizar = updateData(sql)
+        # ahora insertar las nuevas
+        for op2 in opcionesNueva:
+            sql = f"""
+                    INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{op2}',
+                    '{id}' ) 
+                    """
+            actualizar = updateData(sql)
 
-    if modo == 1:
-        socketio.emit('cambioDeEncuesta', {
-                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id})
+
+        sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' and id = '{id}'  "
+        encuestaById = getDataOne(sql)
+        playEncuesta = encuestaById[6]
+
+        if modo == 1:
+            if activar == 1:
+                sql = f"""
+                            update mn_eventos set modo = 1, status = 1 where 
+                            id = '{id_evento}' and id_user = '{id_user}' 
+                            """
+                eventoUpdate = updateData(sql)
+                sql = f"""
+                            update mn_tipo_encuesta set play = 0 where 
+                            id_evento = '{id_evento}' and id_user = '{id_user}' 
+                            """
+                tipoEncuesta = updateData(sql)
+                sql = f"""
+                            update mn_tipo_encuesta set play = 1 where 
+                            id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id}'
+                            """
+                tipoEncuesta = updateData(sql)
+                socketio.emit('CrearEncuestayActivar', {
+                                "msj": "crearon una encuesta y la activaron", "codigo": codigo, "id_encuesta": id}, to=codigo)
+            else:
+                socketio.emit('GuardarEncuesta', {"msj": "crearon una encuesta la guardaron pero no la activaron", "codigo": codigo, "id_encuesta": id}, to=codigo)
+                if playEncuesta==1:
+                    socketio.emit('cambioDeEncuesta', {"msj": "editaron la encuesta activa", "codigo": codigo, "id_encuesta": id}, to=codigo)
 
     response = {
         'status': 1,
