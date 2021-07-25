@@ -19,20 +19,10 @@ from app.request.encuestas.diaYHora import *
 from app.request.encuestas.qya import *
 from app.request.socketRequest import *
 
-users = []
+
 mesFecha = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
             "Oct", "Nov", "Dic"]
 
-
-def userJoin(id, username, room):
-    global users
-    user = { id, username, room }
-    users.append(user)
-    return user
-
-def getCurrentUser(id):
-    global users
-    return next(x for x in users if x["id"] == id )
 
 
 

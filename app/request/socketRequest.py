@@ -5,6 +5,38 @@ from flask_socketio import join_room, leave_room,  close_room
 from app.schemas import *
 
 
+users = []
+
+def userJoin(id, username, room):
+    global users
+    user = {"id": id, "username": username, "room": room }
+    users.append(user)
+    print("usuarios conectados", users)
+    return user
+
+def getCurrentUser(id):
+    global users
+    return next(x for x in users if x["id"] == id )
+
+def getRoomUsers(room):
+    global users
+    i = 0
+    for row in users:
+        if row["room"]==room:
+            i=i+1
+    return i
+
+def userLeave(id):
+    global users
+    i = 0
+    for row in users:
+        if row["id"]==id:
+            users.pop(i)
+            return {"status":1, "user": row}
+        i=i+1
+    return {"status":0}
+
+
 @socketio.event
 def connect():
     print("cliente conectado DESDE CONEECT", request.sid)
@@ -12,26 +44,17 @@ def connect():
 
 @socketio.on('disconnect')
 def test_disconnect():
+    global users
     print('Client disconnected', request.sid)
-    sql = f"SELECT * FROM mn_clientes_conectados where  id_room = '{request.sid}'  "
-    clientes = getDataOne(sql)
-    if clientes: 
-        room = clientes[2]
-        id_user = clientes[3]
-        leave_room(room)
-    sql = f"""
-        delete from mn_clientes_conectados where id_room = '{request.sid}' 
-        """
-    actualizar = updateData(sql)
-    if clientes:
-        sql = f"SELECT * FROM mn_clientes_conectados where  codigo_evento = '{room}'  "
-        clientes = getData(sql)
-        conectados = len(clientes)
-        if conectados == None:
-            close_room(room)
-        else:
-            socketio.emit('join_room_disconect', {
-            'username': id_user, 'codigo': room, 'conectados': conectados}, to=room)
+    
+    leaveUser = userLeave(request.sid)
+    leave_room(leaveUser['user']['room'])
+    conectadosRoom = getRoomUsers(leaveUser['user']['room'])
+    if conectadosRoom == None:
+        close_room(leaveUser['user']['room'])
+    else:
+        socketio.emit('join_room_disconect', {
+        'username': leaveUser['user']['username'], 'codigo': leaveUser['user']['room'], 'conectados': conectadosRoom}, to=leaveUser['user']['room'])
     
     
 
@@ -40,27 +63,10 @@ def test_disconnect():
 @socketio.on('joinRoom')
 def joinRoom(data):
     print("id de usuario conectado", request.sid)
-    #buscar q el usuario a conectarse no este en el room 
-    sql = f"SELECT * FROM mn_clientes_conectados where  codigo_evento = '{data['room']}' and id_user = '{data['username']}'  "
-    userRoom = getDataOne(sql)
-
-    print("valor busqueda rroom", userRoom)
-    if userRoom == None:
-        #no existe por lo tanto lo guardo de resto nei
-        sql = f"""
-        INSERT INTO mn_clientes_conectados ( id_room, codigo_evento, id_user) VALUES ( '{request.sid}',
-        '{data['room']}', '{data['username']}' ) 
-        """
-        actualizar = updateData(sql)
-
-    app.logger.info("{} has joined the room {}".format(
-        data['username'], data['room']))
+    userJoin(request.sid, data['username'], data['room'])
+    conectadosRoom = getRoomUsers(data['room'])
     join_room(data['room'])
     # en este emit debo enviar las personas conectadas al evento
-    sql = f"SELECT * FROM mn_clientes_conectados where  codigo_evento = '{data['room']}'  "
-    clientes = getData(sql)
-    conectados = len(clientes)
     socketio.emit('join_room_announcement', {
-                  'username': data['username'], 'codigo': data['room'], 'conectados': conectados}, to=data['room'])
+                  'username': data['username'], 'codigo': data['room'], 'conectados': conectadosRoom}, to=data['room'])
                   
-    print("emiti el socket")
