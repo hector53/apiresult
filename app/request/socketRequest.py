@@ -69,4 +69,11 @@ def joinRoom(data):
     # en este emit debo enviar las personas conectadas al evento
     socketio.emit('join_room_announcement', {
                   'username': data['username'], 'codigo': data['room'], 'conectados': conectadosRoom}, to=data['room'])
+
+@socketio.on('enviarReaccion')
+def joinRoom(data):
+    print("enviar reaccion", request.sid)
+    # en este emit debo enviar las personas conectadas al evento
+    socketio.emit('recibiReaccion', {
+                  'username': data['username'], 'codigo': data['room'], 'tipo': data['tipo']}, to=data['room'])
                   
