@@ -177,6 +177,7 @@ def votar_encuesta():
     else:
         status = 1
         sql = f"SELECT * FROM mn_users_cookie where cookie = '{miUid}' "
+        print(sql)
         getIP = getDataOne(sql)
         MiIp = getIP[2]
     # buscar si esta encuesta es multiple respuesta o no
