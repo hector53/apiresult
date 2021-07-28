@@ -201,6 +201,7 @@ def update_user_invitado():
         response = {
             "status": 1
         }
+        print("user ya existe ")
     else:
         sql = f"""
         INSERT INTO mn_users_cookie ( name, ip, pais, cookie, fecha) 
@@ -208,6 +209,7 @@ def update_user_invitado():
         ( 'guest', '{ipUser}', '{pais}', '{cookieUser}', '{datetime.now()}'  ) 
         """
         id_user = updateData(sql)
+        print("user registrado ")
 
         response = {
             "status": 1
