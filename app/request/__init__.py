@@ -24,16 +24,6 @@ mesFecha = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
             "Oct", "Nov", "Dic"]
 
 
-
-
-
-
-
-
-
-
-
-
 @app.route('/api/login', methods=['POST'])
 def login():
     body = request.get_json()
@@ -56,33 +46,25 @@ def login():
     else:
         abort(make_response(jsonify(message="data user incorrect"), 401))
 
-@app.route('/api/_get_test', methods=['POST'])
-def guardar_capture():
-    body = request.get_json()
-    person1 = {
-        "name": "Bob",
-        "id": body["id"],
-    }
-    return jsonify(person1)
 
 @app.route('/api/set', methods=['GET'])
 def setsesion():
     session['misesion'] = 'value'
     return 'ok'
 
+
 @app.route('/api/getSession', methods=['GET'])
 @jwt_required()
 def getSession():
     current_user_id = get_jwt_identity()
-    #buscar si el usuario tiene ip 
+    # buscar si el usuario tiene ip
     sql = f"SELECT * FROM mn_users where id = '{current_user_id}' "
     buscarUser = getDataOne(sql)
-    if buscarUser: 
+    if buscarUser:
         ip = buscarUser[7]
     else:
         ip = ''
     return jsonify({"id": current_user_id, "ip": ip}), 200
-
 
 
 @app.route('/api/update_ip_user_registered', methods=['POST'])
@@ -105,6 +87,7 @@ def update_ip_user_registered():
 
     return jsonify(response)
 
+
 @app.route('/api/me', methods=['GET'])
 def getUser():
     body = request.get_json()
@@ -123,6 +106,7 @@ def salir():
     session.pop('username', None)
     session.pop('user', None)
     return jsonify(status=1)
+
 
 @app.route('/api/register', methods=["POST"])
 def registrar_user():
@@ -201,72 +185,100 @@ def crear_user_invitado():
     return jsonify(response)
 
 
+# update cookie user invitado
+@app.route('/api/update_user_invitado', methods=["POST"])
+def update_user_invitado():
+    body = request.get_json()
+    print(body)
+    cookieUser = body["cookieUser"]
+    pais = body["pais"]
+    ipUser = body["ipUser"]
+
+    sql = f"SELECT * FROM mn_users_cookie where cookie = '{cookieUser}'  "
+    # buscar por uid las encuestas q tenga en la db
+    cookieUser = getDataOne(sql)
+    if cookieUser:
+        response = {
+            "status": 1
+        }
+    else:
+        sql = f"""
+        INSERT INTO mn_users_cookie ( name, ip, pais, cookie, fecha) 
+        VALUES 
+        ( 'guest', '{ipUser}', '{pais}', '{cookieUser}', '{datetime.now()}'  ) 
+        """
+        id_user = updateData(sql)
+
+        response = {
+            "status": 1
+        }
+    return jsonify(response)
+
+
 # user not registered
 @app.route('/api/events_not_registered', methods=['GET'])
 def events_not_registered():
-        cookieNotUser = request.args.get('cookieNotUser', '')
-        sql = f"SELECT * FROM mn_eventos where id_user = '{cookieNotUser}' order by id desc "
-        # buscar por uid las encuestas q tenga en la db
-        evento = getData(sql)
-        data = []
-        if evento:
-                totalVotos = 0
-                for row in evento:
-                        idEvento = row[0]
-                
-                        # buscar la encuesta creada para saber el tipo de encuesta
-                        sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{cookieNotUser}' and id_evento = '{idEvento}'  "
-                        print("sql asdasdsadasd", sql)
-                        # buscar por uid las encuestas q tenga en la db
-                        getEncuesta = getDataOne(sql)
-                        print("get encuesta", getEncuesta)
-                        tipo = getEncuesta[1]
-                        id_encuesta = getEncuesta[0]
+    cookieNotUser = request.args.get('cookieNotUser', '')
+    sql = f"SELECT * FROM mn_eventos where id_user = '{cookieNotUser}' order by id desc "
+    # buscar por uid las encuestas q tenga en la db
+    evento = getData(sql)
+    data = []
+    if evento:
+        totalVotos = 0
+        for row in evento:
+            idEvento = row[0]
 
-                        #select cant de votos por tipo encuesta 
+            # buscar la encuesta creada para saber el tipo de encuesta
+            sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{cookieNotUser}' and id_evento = '{idEvento}'  "
+            print("sql asdasdsadasd", sql)
+            # buscar por uid las encuestas q tenga en la db
+            getEncuesta = getDataOne(sql)
+            print("get encuesta", getEncuesta)
+            tipo = getEncuesta[1]
+            id_encuesta = getEncuesta[0]
 
-                        if tipo == 1:
-                                sqlVO = f"SELECT COUNT(*) FROM `mn_votos_choice` WHERE  id_evento = '{idEvento}' "
-                                cantVoto = getDataOne(sqlVO)
-                        
-                        if tipo == 2:
-                                sqlVO = f"SELECT COUNT(*) FROM `mn_nube_palabras` WHERE  id_evento = '{idEvento}' "
-                                cantVoto = getDataOne(sqlVO)
-                        if tipo == 4:
-                                sqlVO = f"SELECT COUNT(*) FROM `mn_date_horas_votos` WHERE  id_evento = '{idEvento}' "
-                                cantVoto = getDataOne(sqlVO)
+            # select cant de votos por tipo encuesta
 
+            if tipo == 1:
+                sqlVO = f"SELECT COUNT(*) FROM `mn_votos_choice` WHERE  id_evento = '{idEvento}' "
+                cantVoto = getDataOne(sqlVO)
 
-                        
-                        totalVotos = totalVotos + cantVoto[0]
+            if tipo == 2:
+                sqlVO = f"SELECT COUNT(*) FROM `mn_nube_palabras` WHERE  id_evento = '{idEvento}' "
+                cantVoto = getDataOne(sqlVO)
+            if tipo == 4:
+                sqlVO = f"SELECT COUNT(*) FROM `mn_date_horas_votos` WHERE  id_evento = '{idEvento}' "
+                cantVoto = getDataOne(sqlVO)
 
+            totalVotos = totalVotos + cantVoto[0]
 
+            data.append({
+                'id': row[0],
+                'titulo': row[1],
+                'codigo': row[3],
+                'fecha':   time_passed(str(row[8])),
+                'cantVoto': cantVoto[0],
+                'tipo': tipo,
+                'id_encuesta': id_encuesta
+            })
 
-                        data.append({
-                        'id': row[0],
-                        'titulo': row[1],
-                        'codigo': row[3],
-                        'fecha':   time_passed(str(row[8])),
-                        'cantVoto': cantVoto[0],
-                        'tipo': tipo,
-                        'id_encuesta': id_encuesta
-                        })
+        response = {
+            'encuestas': data,
+            'cantVotos': totalVotos,
+            'cantEncuestas': len(evento),
+            'status': 1,
+        }
 
-                response = {
-                        'encuestas': data,
-                        'cantVotos': totalVotos,
-                        'cantEncuestas': len(evento),
-                        'status': 1,
-                }
+    else:
+        response = {
+            'status': 0,
+        }
 
-        else:
-                response = {
-                        'status': 0,
-                }
-
-        return jsonify(response)
+    return jsonify(response)
 
 # user registered
+
+
 @app.route('/api/events_user_registered', methods=['GET'])
 @jwt_required()
 def events_user_registered():
@@ -309,10 +321,12 @@ def events_user_registered():
 
 # funcion codigo aleatorio
 
+
 def codigoAleatorio(s):
     ran = ''.join(random.choices(string.ascii_uppercase + string.digits, k=s))
     return str(ran)
 #
+
 
 @app.route('/api/crear_evento', methods=["POST"])
 @jwt_required()
@@ -596,7 +610,8 @@ def publicar_evento():
         codigo = '{codigo}' and id_user = '{id_user}'
         """
     evento = updateData(sql)
-    socketio.emit('cambiarStatusEvent', {"codigo": codigo, "status": status}, to=codigo)
+    socketio.emit('cambiarStatusEvent', {
+                  "codigo": codigo, "status": status}, to=codigo)
     response = {
         'status': 1
     }
@@ -691,7 +706,7 @@ def modo_live_evento_encuesta_activa():
         """
     tipoEncuesta = updateData(sql)
     socketio.emit('cambiarEncuestaActiva', {
-                   "msj": "cambiando de encuesta activa", "codigo": codigo, "id_encuesta": idEncuesta}, to=codigo)
+        "msj": "cambiando de encuesta activa", "codigo": codigo, "id_encuesta": idEncuesta}, to=codigo)
     response = {
         'status': 1
     }
@@ -844,7 +859,7 @@ def get_encuestas_by_id_live():
     return jsonify(response)
 
 
-#get encuestas by id user not registered dashboard
+# get encuestas by id user not registered dashboard
 
 # get encuesta by id en modo live modal
 @app.route('/api/get_encuestas_by_id_user_not_registered_dashboard',  methods=["GET"])
@@ -984,10 +999,10 @@ def get_event_by_cod():
                 "encuestaActiva": play
             }
         else:
-            #pasar el evento a stop 
+            # pasar el evento a stop
             """
             sql = f"""
-            #update mn_eventos set modo = 0 where id = '{id_evento}'
+            # update mn_eventos set modo = 0 where id = '{id_evento}'
             """
             updateEvento = updateData(sql)
             """
@@ -1002,7 +1017,6 @@ def get_event_by_cod():
         }
 
     return jsonify(response)
-
 
 
 @app.route('/api/delete_poll_simple_live_by_id', methods=["POST"])
@@ -1078,9 +1092,10 @@ def delete_poll_simple_live_by_id():
                                     """
                     actualizar = deleteData(sql)
                     socketio.emit('EliminarEncuestaActiva', {
-                                "tipo": 3, "msj": "elimine una encuesta", "codigo": codigo, "id_encuesta": id_encuesta_primera}, to=codigo)
+                        "tipo": 3, "msj": "elimine una encuesta", "codigo": codigo, "id_encuesta": id_encuesta_primera}, to=codigo)
                 else:
-                    socketio.emit('sinEncuestasAlEliminar', { "msj": "sin encuestas", "codigo": codigo}, to=codigo)
+                    socketio.emit('sinEncuestasAlEliminar', {
+                                  "msj": "sin encuestas", "codigo": codigo}, to=codigo)
 
         response = {
             'status': actualizar,
@@ -1093,78 +1108,77 @@ def delete_poll_simple_live_by_id():
     return jsonify(response)
 
 
-#delete event by id by user not registered 
+# delete event by id by user not registered
 
 @app.route('/api/delete_poll_by_id_not_registered', methods=["POST"])
 def delete_poll_by_id_not_registered():
-        body = request.get_json()
-        id_event = body["id_event"]
-        id_encuesta = body["id_encuesta"]
-        id_user = body["p"]
-        #buscar si el evento existe 
+    body = request.get_json()
+    id_event = body["id_event"]
+    id_encuesta = body["id_encuesta"]
+    id_user = body["p"]
+    # buscar si el evento existe
 
-        sql = f"SELECT * FROM mn_eventos where id = '{id_event}' and id_user = '{id_user}'  "
-        evento = getDataOne(sql)
-        if evento:
-                sql = f"SELECT * FROM mn_tipo_encuesta where id = '{id_encuesta}' and id_user = '{id_user}' and id_evento = '{id_event}'  "
-                buscarTipo = getDataOne(sql)
-                sql = f"""
+    sql = f"SELECT * FROM mn_eventos where id = '{id_event}' and id_user = '{id_user}'  "
+    evento = getDataOne(sql)
+    if evento:
+        sql = f"SELECT * FROM mn_tipo_encuesta where id = '{id_encuesta}' and id_user = '{id_user}' and id_evento = '{id_event}'  "
+        buscarTipo = getDataOne(sql)
+        sql = f"""
                 DELETE FROM `mn_eventos` WHERE  id = '{id_event}'
                 """
-                actualizar = deleteData(sql)
-                tipo = 0
-                if buscarTipo:
-                        tipo = buscarTipo[1]
-                        sql = f"""
+        actualizar = deleteData(sql)
+        tipo = 0
+        if buscarTipo:
+            tipo = buscarTipo[1]
+            sql = f"""
                         DELETE FROM `mn_tipo_encuesta` WHERE  id = '{id_encuesta}'
                         """
-                        actualizar = deleteData(sql)
-                        if tipo == 1:
-                                sql = f"""
+            actualizar = deleteData(sql)
+            if tipo == 1:
+                sql = f"""
                                 DELETE FROM `mn_tipo_encuesta_choice` WHERE  id_tipo_encuesta = '{id_encuesta}'
                                 """
-                                actualizar = deleteData(sql)
+                actualizar = deleteData(sql)
 
-                                sql = f"""
+                sql = f"""
                                 DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id_encuesta}' 
                                 """
-                                actualizar = deleteData(sql)
-                        if tipo == 2:
-                                sql = f"""
+                actualizar = deleteData(sql)
+            if tipo == 2:
+                sql = f"""
                                 DELETE FROM `mn_nube_palabras` WHERE  id_tipo_encuesta = '{id_encuesta}'
                                 """
-                                actualizar = deleteData(sql)
-                        
-                        if tipo == 4:
-                                sql = f"""
+                actualizar = deleteData(sql)
+
+            if tipo == 4:
+                sql = f"""
                                 DELETE FROM `mn_date_day` WHERE  id_encuesta = '{id_encuesta}'
                                 """
-                                actualizar = deleteData(sql)
+                actualizar = deleteData(sql)
 
-                                sql = f"""
+                sql = f"""
                                 DELETE FROM `mn_date_horas` WHERE  id_encuesta = '{id_encuesta}'
                                 """
-                                actualizar = deleteData(sql)
+                actualizar = deleteData(sql)
 
-                                sql = f"""
+                sql = f"""
                                 DELETE FROM `mn_date_horas_votos` WHERE  id_tipo_encuesta = '{id_encuesta}'
                                 """
-                                actualizar = deleteData(sql)
+                actualizar = deleteData(sql)
 
-
-                        response = {
-                                'status': 1,
-                        }
-                else:
-                        response = {
-                        'status': 'error',
-                        }
+            response = {
+                'status': 1,
+            }
         else:
-                response = {
-                        'status': 'error',
-                }
+            response = {
+                'status': 'error',
+            }
+    else:
+        response = {
+            'status': 'error',
+        }
 
-        return jsonify(response)
+    return jsonify(response)
 
 
 @app.route('/api/_sortear1', methods=["GET"])

@@ -555,8 +555,8 @@ def votar_encuesta_dia_y_hora_front():
         }
 
     if modoLive == 1:
-        socketio.emit('cambioDeEncuesta', {
-                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
+        socketio.emit('votoUsuarioEncuesta', {
+                       "msj": "usuario voto en una encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
     socketio.emit('respuestaDelVoto', {
                   "tipo": 4, "id_evento": id_evento, "msj": "Nueva voto en hora", "id_encuesta": id_encuesta}, to=codigo)
 
