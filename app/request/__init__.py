@@ -190,11 +190,11 @@ def crear_user_invitado():
 def update_user_invitado():
     body = request.get_json()
     print(body)
-    cookieUser = body["cookieUser"]
+    cookieUserFrom = body["cookieUser"]
     pais = body["pais"]
     ipUser = body["ipUser"]
 
-    sql = f"SELECT * FROM mn_users_cookie where cookie = '{cookieUser}'  "
+    sql = f"SELECT * FROM mn_users_cookie where cookie = '{cookieUserFrom}'  "
     # buscar por uid las encuestas q tenga en la db
     cookieUser = getDataOne(sql)
     if cookieUser:
@@ -206,7 +206,7 @@ def update_user_invitado():
         sql = f"""
         INSERT INTO mn_users_cookie ( name, ip, pais, cookie, fecha) 
         VALUES 
-        ( 'guest', '{ipUser}', '{pais}', '{cookieUser}', '{datetime.now()}'  ) 
+        ( 'guest', '{ipUser}', '{pais}', '{cookieUserFrom}', '{datetime.now()}'  ) 
         """
         id_user = updateData(sql)
         print("user registrado ")
