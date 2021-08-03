@@ -370,6 +370,72 @@ def crear_evento():
     return jsonify(response)
 
 
+
+
+@app.route('/api/cambiar_nombre_evento_by_cod', methods=['GET'])
+@jwt_required()
+def cambiar_nombre_evento_by_cod():
+    id_user = get_jwt_identity()
+    codigo = request.args.get('cod', '')
+    nombre = request.args.get('nombre', '')
+    sql = f"SELECT * FROM mn_eventos where id_user = '{id_user}' and codigo = '{codigo}'  "
+    # buscar por uid las encuestas q tenga en la db
+    evento = getDataOne(sql)
+    if evento:
+        id_evento = evento[0]
+        sql = f"""
+        update mn_eventos set titulo = '{nombre}' where 
+        id = '{id_evento}' 
+        """
+        id_tipo = updateData(sql)
+        response = {
+            "status": 1
+        }
+        return jsonify(response)
+    else:
+        abort(make_response(jsonify(message="data user incorrect"), 401))
+
+@app.route('/api/cambiar_fecha_evento_by_cod', methods=['GET'])
+@jwt_required()
+def cambiar_fecha_evento_by_cod():
+    id_user = get_jwt_identity()
+    codigo = request.args.get('cod', '')
+    fecha = request.args.get('fecha', '')
+    zonaHoraria = request.args.get('zonaHoraria', '')
+    from_zone = tz.gettz('UTC')
+    to_zone = tz.gettz(zonaHoraria)
+    print("llego la fecha", fecha)
+    sql = f"SELECT * FROM mn_eventos where id_user = '{id_user}' and codigo = '{codigo}'  "
+    # buscar por uid las encuestas q tenga en la db
+    evento = getDataOne(sql)
+    if evento:
+        id_evento = evento[0]
+        fecha = datetime.strptime(fecha, '%Y-%m-%d %H:%M:%S')
+        #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+       # utc = fecha.replace(tzinfo=from_zone)
+      #  central = utc.astimezone(to_zone)
+      #  print(central)
+      #  fecha = str(central)
+        #guardo la fehca nuea
+        sql = f"""
+        update mn_eventos set fecha = '{fecha}' where 
+        id = '{id_evento}' 
+        """
+        id_tipo = updateData(sql)
+        response = {
+            "status": 1
+        }
+        return jsonify(response)
+    else:
+        abort(make_response(jsonify(message="data user incorrect"), 401))
+
+
+
+
+
+
+
+
 @app.route('/api/get_encuestas_event', methods=['GET'])
 @jwt_required()
 def get_encuestas_event():
@@ -491,7 +557,7 @@ def get_encuestas_event():
             "eventName": nameEvent,
             "eventStatus": eventStatus,
             "eventModo": eventModo,
-            "fecha": str(fecha.date())
+            "fecha": str(fecha)
         }
 
         return jsonify(response)
@@ -503,7 +569,7 @@ def get_encuestas_event():
             "eventName": nameEvent,
             "eventStatus": eventStatus,
             "eventModo": eventModo,
-            "fecha": str(fecha.date())
+            "fecha": str(fecha)
         }
         return jsonify(response)
 
@@ -614,6 +680,8 @@ def publicar_evento():
     evento = updateData(sql)
     socketio.emit('cambiarStatusEvent', {
                   "codigo": codigo, "status": status}, to=codigo)
+    socketio.emit('cambiarStatusEvent', {
+                  "codigo": codigo, "status": status}, to=codigo+"_admin")
     response = {
         'status': 1
     }
@@ -670,6 +738,8 @@ def modo_live_evento():
 
     socketio.emit('activarModoPresentacion', {
                   "codigo": codigo, "modo": modoLive}, to=codigo)
+    socketio.emit('activarModoPresentacion', {
+                  "codigo": codigo, "modo": modoLive}, to=codigo+"_admin")
     response = {
         'status': 1
     }
@@ -995,6 +1065,7 @@ def get_event_by_cod():
                 "status": 1,
                 "id":  evento[0],
                 "titulo": evento[1],
+                "fecha": str(evento[8]),
                 "statusEvent": evento[7],
                 "modo": evento[5],
                 "tipoEncuesta": encuestaTipo,
@@ -1009,9 +1080,12 @@ def get_event_by_cod():
             updateEvento = updateData(sql)
             """
             response = {
+                "id":  evento[0],
                 "status": 2,
                 "statusEvent": evento[7],
                 "modo": evento[5],
+                "titulo": evento[1],
+                "fecha": str(evento[8]),
             }
     else:
         response = {
@@ -1237,3 +1311,120 @@ def get_users_conectados():
     }
 
     return jsonify(response)
+
+
+@app.route('/api/borrar_evento_by_admin', methods=['POST'])
+@jwt_required()
+def borrar_evento_by_admin():
+    body = request.get_json()
+    codigo = body["codigo"]
+    id_user = get_jwt_identity()
+    sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
+    print(sql)
+    evento = getDataOne(sql)
+    if evento:
+        id_evento = evento[0]
+        sql = f"""
+        delete from mn_eventos where ID = '{id_evento}'
+        """
+        borrar = updateData(sql)
+        response = {
+            "status": 1
+        }
+        return jsonify(response)
+    else:
+        abort(make_response(jsonify(message="data user incorrect"), 401))
+
+
+@app.route('/api/duplicar_evento_by_admin', methods=['POST'])
+@jwt_required()
+def duplicar_evento_by_admin():
+    body = request.get_json()
+    codigo = body["codigo"]
+    id_user = get_jwt_identity()
+    titulo =  body["titulo"]
+    codigoNew = codigoAleatorio(5)
+    sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
+    print(sql)
+    evento = getDataOne(sql)
+    if evento:
+        id_evento = evento[0]
+        titulo = str(evento[1])+"_duplicate"
+        #ahora crear un evento con las mismas caracteristicas 
+        sql = f"""
+        INSERT INTO mn_eventos ( titulo, descripcion, codigo, id_user, modo, tipoUser,  status, fecha) 
+        VALUES 
+        ( '{titulo}', '', '{codigoNew}', '{id_user}', 0, 1, 1, '{datetime.now()}'  ) 
+        """
+        id_eventoNew = updateData(sql)
+        # ahora buscar las encuestas del evento y recorrerlar para irlas creando una por una 
+        sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' and id_user = '{id_user}'  "
+        print(sql)
+        encuestasViejas = getData(sql)
+        for row in encuestasViejas:
+            tipoVieja = row[1]
+            tituloVieja = row[2]
+            idEncuestaVieja = row[0]
+            sql = f"SELECT * FROM mn_tipo_encuesta where id_user = '{id_user}' and id_evento = '{id_evento}' order by posicion desc "
+            # buscar por uid las encuestas q tenga en la db
+            enPosicion = getDataOne(sql)
+            if enPosicion:
+                posicion = enPosicion[3]+1
+            else:
+                posicion = 0+1
+            sql = f"""
+            INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento,  fecha) VALUES ( '{tipoVieja}',
+            '{tituloVieja}', '{posicion}', '{id_user}', '{id_eventoNew}',  '{datetime.now()}'  ) 
+            """
+            id_tipo_encuesta = updateData(sql)
+            if tipoVieja == 1: 
+                #encuesta siomple debo crear las opciones q tiene 
+                #para crerarlas primero debo buscarlas 
+                sql = f"SELECT * FROM mn_tipo_encuesta_choice where id_tipo_encuesta = '{idEncuestaVieja}'  "
+                # buscar por uid las encuestas q tenga en la db
+                esOpciones = getData(sql)
+                for op in esOpciones: 
+                    sql = f"""
+                    INSERT INTO mn_tipo_encuesta_choice ( opcion, id_tipo_encuesta) VALUES ( '{op[1]}',
+                    '{id_tipo_encuesta}' ) 
+                    """
+                    actualizar = updateData(sql)
+            if tipoVieja == 3:
+                #sorteo 
+                sql = f"SELECT * FROM mn_sorteos_participantes where id_encuesta = '{idEncuestaVieja}'  "
+                # buscar por uid las encuestas q tenga en la db
+                esParticipantes = getData(sql)
+                for pa in esParticipantes:
+                    sql = f"""
+                    INSERT INTO mn_sorteos_participantes ( value, id_encuesta) VALUES ( '{pa[1]}',
+                    '{id_tipo_encuesta}' ) 
+                    """
+                    actualizar = updateData(sql)
+            if tipoVieja == 4:
+                #diayhora
+                sql = f"SELECT * FROM mn_date_day where id_encuesta = '{idEncuestaVieja}'  "
+                # buscar por uid las encuestas q tenga en la db
+                esDia = getData(sql)
+                for di in esDia:
+                    sql = f"""
+                    INSERT INTO mn_date_day ( fecha, id_encuesta) VALUES ( '{di[1]}',
+                    '{id_tipo_encuesta}' ) 
+                    """
+                    id_dia_nuevo = updateData(sql)
+                    #ahora buscar las horas de este dia 
+                    sql = f"SELECT * FROM mn_date_horas where id_date_day = '{di[0]}'  "
+                    # buscar por uid las encuestas q tenga en la db
+                    esHora = getData(sql)
+                    for ho in esHora:
+                        sql = f"""
+                        INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{ho[1]}',
+                        '{id_dia_nuevo}', '{id_tipo_encuesta}' ) 
+                        """
+                        actualizar = updateData(sql)
+        response = {
+            "status": 1,
+            "codigo": codigoNew
+        }
+        return jsonify(response)
+    else:
+        abort(make_response(jsonify(message="data user incorrect"), 401))

@@ -213,6 +213,7 @@ def get__sorteo_by_id_encuesta_modal():
 @app.route('/api/sortear_sorteo_live', methods=['POST'])
 def sortear_sorteo_live():
     body = request.get_json()
+    print(body)
     participantes = body["participantes"]
     participantes = json.loads(participantes)
     cantParticipantes = len(participantes)
