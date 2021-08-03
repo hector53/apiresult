@@ -88,6 +88,7 @@ def delete_poll_simple_live():
     body = request.get_json()
     id = body["id"]
     id_opcion = body["id_opcion"]
+    codigo = body["codigo"]
     id_user = get_jwt_identity()
     print("id de la encuesta", id)
     print("id de la opcion", id_opcion)
@@ -100,6 +101,8 @@ def delete_poll_simple_live():
         DELETE FROM `mn_votos_choice` WHERE  id_tipo_encuesta = '{id}' and id_opcion = '{id_opcion}'
                 """
     actualizar = deleteData(sql)
+
+    socketio.emit('cambioDeEncuesta', {"msj": "borrando una opcion de lña encuesta simple", "codigo": codigo, "id_encuesta": id}, to=codigo)
 
     response = {
         'status': actualizar,

@@ -528,6 +528,16 @@ def votar_encuesta_dia_y_hora_front():
     id_encuesta = body["id_encuesta"]
     id_user = body["p"]
     modoLive = body["liveMode"]
+    login = body["login"]
+    if login:
+        sql = f"SELECT * FROM mn_users where id = '{id_user}' "
+        getIP = getDataOne(sql)
+        MiIp = getIP[7]
+    else:
+        sql = f"SELECT * FROM mn_users_cookie where cookie = '{id_user}' "
+        print(sql)
+        getIP = getDataOne(sql)
+        MiIp = getIP[2]
     # crear funciones para validar q el id del evento existe y q el usuario existe
 
     sql = f"SELECT * FROM mn_date_horas_votos where id_date_hora = '{hora}' and id_user = '{id_user}'  "
@@ -544,6 +554,13 @@ def votar_encuesta_dia_y_hora_front():
         }
     else:
         # votar
+        #aqui comprobar lo de la ip
+        comprobarIp = comprobar_ip_dia_y_hora(login, MiIp, id_user, id_encuesta)
+        if comprobarIp == 0:
+            response = {
+            'status': 5
+            }
+            return jsonify(response)
         sql = f"""
                 INSERT INTO mn_date_horas_votos ( id_date_hora, id_user, id_tipo_encuesta, id_evento, fecha) VALUES ( '{hora}',
                 '{id_user}', '{id_encuesta}', '{id_evento}', '{datetime.now()}'  ) 
@@ -561,6 +578,55 @@ def votar_encuesta_dia_y_hora_front():
                   "tipo": 4, "id_evento": id_evento, "msj": "Nueva voto en hora", "id_encuesta": id_encuesta}, to=codigo)
 
     return jsonify(response)
+
+
+def comprobar_ip_dia_y_hora(login, MiIp, miUid, id_encuesta):
+    if login:
+        sql2 = f"SELECT * FROM mn_users where ip = '{MiIp}' and id NOT IN ({miUid})    "
+        getUserIp = getData(sql2)
+        if getUserIp:
+            #existen por lo tanto buscar si han votado en esta encuesta 
+            for user in getUserIp:
+                sql2 = f"  SELECT * FROM mn_votos_choice where id_tipo_encuesta = {id_encuesta} and id_user = '{user[0]}'   "
+                getUserIp2 = getData(sql2)
+                print(sql2)
+                if getUserIp2:
+                    # si ha votado alguien en esta encuesta por lo tanto no necesito buscar mas y pailas 
+                    return 0
+        sql2 = f"SELECT * FROM mn_users_cookie where ip = '{MiIp}' and cookie NOT IN ('{miUid}')    "
+        getUserIp = getData(sql2)
+        if getUserIp:
+            #existen por lo tanto buscar si han votado en esta encuesta 
+            for user in getUserIp:
+                sql2 = f"  SELECT * FROM mn_date_horas_votos where  id_tipo_encuesta = {id_encuesta} and id_user = '{user[4]}'   "
+                getUserIp2 = getData(sql2)
+                if getUserIp2:
+                    # si ha votado alguien en esta encuesta por lo tanto no necesito buscar mas y pailas 
+                    return 0
+    else:
+        sql2 = f"SELECT * FROM mn_users where ip = '{MiIp}'     "
+        getUserIp = getData(sql2)
+        if getUserIp:
+            #existen por lo tanto buscar si han votado en esta encuesta 
+            for user in getUserIp:
+                sql2 = f"  SELECT * FROM mn_date_horas_votos where  id_tipo_encuesta = {id_encuesta} and id_user = '{user[4]}'    "
+                getUserIp2 = getData(sql2)
+                print(sql2)
+                if getUserIp2:
+                    # si ha votado alguien en esta encuesta por lo tanto no necesito buscar mas y pailas 
+                    return 0
+        sql2 = f"SELECT * FROM mn_users_cookie where ip = '{MiIp}' and cookie NOT IN ('{miUid}')    "
+        print(sql2)
+        getUserIp = getData(sql2)
+        if getUserIp:
+            #existen por lo tanto buscar si han votado en esta encuesta 
+            for user in getUserIp:
+                sql2 = f"  SELECT * FROM mn_date_horas_votos where  id_tipo_encuesta = {id_encuesta} and id_user = '{user[4]}'    "
+                getUserIp2 = getData(sql2)
+                if getUserIp2:
+                    # si ha votado alguien en esta encuesta por lo tanto no necesito buscar mas y pailas 
+                    return 0
+    return 1
 
 
 # get diayhora activo modo live
