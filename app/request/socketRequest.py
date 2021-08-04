@@ -71,9 +71,17 @@ def joinRoom(data):
                   'username': data['username'], 'codigo': data['room'], 'conectados': conectadosRoom}, to=data['room'])
 
 @socketio.on('enviarReaccion')
-def joinRoom(data):
+def enviarReaccion(data):
     print("enviar reaccion", request.sid)
     # en este emit debo enviar las personas conectadas al evento
     socketio.emit('recibiReaccion', {
                   'username': data['username'], 'codigo': data['room'], 'tipo': data['tipo']}, to=data['room'])
                   
+
+@socketio.on('ping')
+def pingCliente(data):
+    print("ping recibido del usuario: ",  data['username'])
+    # en este emit debo enviar las personas conectadas al evento
+    conectadosRoom = getRoomUsers(data['room'])
+    socketio.emit('pong', {
+                  'username': data['username'], 'codigo': data['room'], 'conectados': conectadosRoom}, to=data['room'])

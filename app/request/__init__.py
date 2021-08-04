@@ -118,13 +118,15 @@ def registrar_user():
     userName = body["userName"]
     passW = body["pass"]
     userCookie = body["userCookie"]
+    ipUser = body["ipUser"]
+    paisUser = body["paisUser"]
 
     if firstName and lastName and email and userName and passW:
         # todos estos campos estan llenos
         sql = f"""
-                INSERT INTO mn_users ( firstName, lastName, email, userName, pass, cookieUser, date) 
+                INSERT INTO mn_users ( firstName, lastName, email, userName, pass, cookieUser, ip, pais, date) 
                 VALUES 
-                ( '{firstName}', '{lastName}', '{email}', '{userName}', '{passW}', '{userCookie}', '{datetime.now()}'  ) 
+                ( '{firstName}', '{lastName}', '{email}', '{userName}', '{passW}', '{userCookie}',  '{ipUser}',  '{paisUser}', '{datetime.now()}'  ) 
                 """
         id_user = updateData(sql)
         # ahora reemplazar este id por el id de las cookies en las encuestas
