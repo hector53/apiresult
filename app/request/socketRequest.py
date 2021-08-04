@@ -50,11 +50,11 @@ def test_disconnect():
     leaveUser = userLeave(request.sid)
     leave_room(leaveUser['user']['room'])
     conectadosRoom = getRoomUsers(leaveUser['user']['room'])
+    socketio.emit('join_room_disconect', {
+        'username': leaveUser['user']['username'], 'codigo': leaveUser['user']['room'], 'conectados': conectadosRoom}, to=leaveUser['user']['room'])
     if conectadosRoom == None:
         close_room(leaveUser['user']['room'])
-    else:
-        socketio.emit('join_room_disconect', {
-        'username': leaveUser['user']['username'], 'codigo': leaveUser['user']['room'], 'conectados': conectadosRoom}, to=leaveUser['user']['room'])
+    
     
     
 
