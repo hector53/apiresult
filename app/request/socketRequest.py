@@ -18,6 +18,10 @@ def getCurrentUser(id):
     global users
     return next(x for x in users if x["id"] == id )
 
+def getCurrentUsername(username):
+    global users
+    return next(x for x in users if x["username"] == username )
+
 def getRoomUsers(room):
     global users
     i = 0
@@ -61,7 +65,7 @@ def test_disconnect():
 @socketio.on('desconectar')
 def desconectarManual():
     global users
-    print('Client disconnected', request.sid)
+    print('Client disconnected de forma manual', request.sid)
 
    
     
@@ -110,3 +114,21 @@ def ping(data):
 
 def ack(data):
     print("me llego el callback")
+
+
+
+@app.route('/api/desconectar_user_manual', methods=["POST"])
+def desconectar_user_manual():
+    print("llegue aqui")
+    body = request.get_json()
+    username = body["username"]
+    room = body["room"]
+    getUser = getCurrentUsername(username)
+    print("get user: ", getUser)
+
+    response = {
+        "status": 1
+    }
+
+    return jsonify(response)
+
