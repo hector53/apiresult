@@ -1,7 +1,7 @@
 from app import app
 from app import socketio
-from flask import request
-from flask_socketio import join_room, leave_room,  close_room
+from flask import request, jsonify
+from flask_socketio import join_room, leave_room,  close_room, rooms
 from app.schemas import *
 
 
@@ -46,6 +46,24 @@ def connect():
 def test_disconnect():
     global users
     print('Client disconnected', request.sid)
+
+   
+    
+    leaveUser = userLeave(request.sid)
+    leave_room(leaveUser['user']['room'])
+    conectadosRoom = getRoomUsers(leaveUser['user']['room'])
+    socketio.emit('join_room_disconect', {
+        'username': leaveUser['user']['username'], 'codigo': leaveUser['user']['room'], 'conectados': conectadosRoom}, to=leaveUser['user']['room'])
+    if conectadosRoom == None:
+        close_room(leaveUser['user']['room'])
+
+
+@socketio.on('desconectar')
+def desconectarManual():
+    global users
+    print('Client disconnected', request.sid)
+
+   
     
     leaveUser = userLeave(request.sid)
     leave_room(leaveUser['user']['room'])
@@ -78,10 +96,17 @@ def enviarReaccion(data):
                   'username': data['username'], 'codigo': data['room'], 'tipo': data['tipo']}, to=data['room'])
                   
 
-@socketio.on('ping')
-def pingCliente(data):
+@socketio.event
+def ping(data):
     print("ping recibido del usuario: ",  data['username'])
+    usuarioActual = getCurrentUser(request.sid)
+    print("usuario actual", usuarioActual)
     # en este emit debo enviar las personas conectadas al evento
     conectadosRoom = getRoomUsers(data['room'])
+    print("hola room", rooms(request.sid))
     socketio.emit('pong', {
-                  'username': data['username'], 'codigo': data['room'], 'conectados': conectadosRoom}, to=data['room'])
+                  'username': data['username'], 'codigo': data['room'], 'conectados': conectadosRoom}, to=data['room'], callback=ack)
+    return 'one', 2
+
+def ack(data):
+    print("me llego el callback")
