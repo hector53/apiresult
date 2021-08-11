@@ -687,7 +687,7 @@ def email_de_prueba():
     msg['Subject'] = 'Tutsplus Newsletter'
 
 
-    msg['From'] = 'emailresultapp@gmail.com'
+    msg['From'] = 'Result.app '
     msg['To'] = emailTo
     password = "199021utf8"
     msg.add_header('Content-Type', 'text/html')
@@ -697,7 +697,7 @@ def email_de_prueba():
     s.starttls()
 
     # Login Credentials for sending the mail
-    s.login(msg['From'], password)
+    s.login('emailresultapp@gmail.com', password)
 
     s.sendmail(msg['From'], [msg['To']], msg.as_string())
 
