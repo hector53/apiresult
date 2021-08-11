@@ -583,7 +583,7 @@ def cron_cancel_suscription_users_by_cancel_method():
 
 @app.route('/api/email_de_prueba', methods=['GET'])
 def email_de_prueba():
-    server = smtplib.SMTP('localhost')
+    emailTo = request.args.get('to', '')
 
     email_content = """
     <html>
@@ -688,7 +688,7 @@ def email_de_prueba():
 
 
     msg['From'] = 'hectoracosta5@gmail.com'
-    msg['To'] = 'rafaelviajero222@gmail.com'
+    msg['To'] = emailTo
     msg.add_header('Content-Type', 'text/html')
     msg.set_payload(email_content)
 
