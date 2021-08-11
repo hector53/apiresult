@@ -586,7 +586,7 @@ def email_de_prueba():
     emailTo = request.args.get('to', '')
 
     email_content = """
-    <p style="text-align: justify;"><img src="https://result.app/img/Logoresult.jpg" alt="" width="300" height="126" /></p>
+    <p style="text-align: justify;"><img src="https://result.app/img/Logoresult.jpg" alt="" width="300" height="100" /></p>
     <p style="text-align: justify;">Dear Hector Acosta (Nananona C.A.),</p>
     <p style="text-align: justify;">This is a notice that an invoice has been generated on 24th Jul 2021.</p>
     <p style="text-align: justify;">Your payment method is: Credit Card</p>
