@@ -693,7 +693,7 @@ def email_de_prueba():
     msg.set_payload(email_content)
 
     s = smtplib.SMTP('localhost')
-    s.starttls()
+    #s.starttls()
 
     s.sendmail(msg['From'], [msg['To']], msg.as_string())
 
