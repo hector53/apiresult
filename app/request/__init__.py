@@ -1,8 +1,9 @@
+from os import name
 from flask import request, jsonify, abort, make_response, session
 from app import app
 from app import socketio
 from app.schemas import *
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from flask_socketio import join_room, leave_room, rooms
 import time
@@ -11,6 +12,7 @@ import string
 import random
 import json
 from dateutil import tz
+import smtplib
 
 from app.request.encuestas.multipleChoice import *
 from app.request.encuestas.nubeDePalabras import *
@@ -64,7 +66,30 @@ def getSession():
         ip = buscarUser[7]
     else:
         ip = ''
-    return jsonify({"id": current_user_id, "ip": ip}), 200
+    firtsName = buscarUser[1]
+    lastName = buscarUser[2]
+    email = buscarUser[3]
+    username = buscarUser[4]
+    premium = buscarUser[10]
+    namePlan = ''
+    if premium == 0:
+        namePlan = 'Limitado'
+    if premium == 2: 
+        namePlan = 'Pro'
+
+
+    return jsonify({"id": current_user_id, "ip": ip, "firtsName": firtsName, "lastName": lastName, "email": email, "username": username, "premium": premium, "namePlan": namePlan }), 200
+
+
+@app.route('/api/get_user_settings', methods=['GET'])
+@jwt_required()
+def get_user_settings():
+    current_user_id = get_jwt_identity()
+    # buscar si el usuario tiene ip
+    sql = f"SELECT * FROM mn_users where id = '{current_user_id}' "
+    buscarUser = getDataOne(sql)
+   
+    return jsonify({"userData": buscarUser}), 200
 
 
 @app.route('/api/update_ip_user_registered', methods=['POST'])
@@ -86,6 +111,215 @@ def update_ip_user_registered():
     }
 
     return jsonify(response)
+
+
+@app.route('/api/guardar_user_perfil', methods=['POST'])
+@jwt_required()
+def guardar_user_perfil():
+    body = request.get_json()
+    firstName = body["firstName"]
+    lastName = body["lastName"]
+    email = body["email"]
+    username = body["username"]
+    tipo = body["tipo"]
+    currentPass = body["currentPass"]
+    newPass = body["newPass"]
+    id_user = get_jwt_identity()
+    if firstName and lastName and email and username and tipo:
+        if tipo == 1: 
+            sql = f"""
+            update mn_users set firstName = '{firstName}', lastName = '{lastName}', 
+            email = '{email}', userName = '{username}' where   id = '{id_user}'  """
+            print(sql)
+            updateIpUser = updateData(sql)
+            response = {
+                'status': 1,
+            }
+            return jsonify(response)
+        if tipo == 2: 
+            #verficar q la contraseña actual sea la misma de la db
+            sql = f"SELECT * FROM mn_users where id = '{id_user}' and pass = '{currentPass}'  "
+            # buscar por uid las encuestas q tenga en la db
+            userPassActual = getDataOne(sql)
+            if userPassActual:
+                sql = f"""
+                update mn_users set firstName = '{firstName}', lastName = '{lastName}'
+                , email = '{email}', userName = '{username}', pass = '{newPass}'  where   id = '{id_user}' """
+                print(sql)
+                updateIpUser = updateData(sql)
+                response = {
+                    'status': 1,
+                }
+                return jsonify(response)
+            else: 
+                 abort(make_response(jsonify(message="current pass incorrect"), 401))
+    else:
+         abort(make_response(jsonify(message="data user incorrect"), 401))
+
+
+
+@app.route('/api/guardar_user_perfil_billing', methods=['POST'])
+@jwt_required()
+def guardar_user_perfil_billing():
+    body = request.get_json()
+    company = body["company"]
+    address = body["address"]
+    city = body["city"]
+    zip = body["zip"]
+    country = body["country"]
+    id_user = get_jwt_identity()
+    if company and address and city and zip and country:
+        #buscar si existe 
+        sql = f"SELECT * FROM mn_users_billing_data where id_user =  '{id_user}'  "
+        getBilling = getDataOne(sql)
+        if getBilling:
+            #existe por lo tanto actualizo
+            sql = f"""
+            update mn_users_billing_data set companyName = '{company}', address = '{address}'
+            , city = '{city}', zip = '{zip}', country = '{country}'  where   id_user = '{id_user}' """
+            updateIpUser = updateData(sql)
+            response = {
+            'status': 1,
+            }
+        else:
+            sql = f"""
+            INSERT INTO mn_users_billing_data ( companyName, address, city, zip, country, id_user) VALUES ( '{company}',
+            '{address}', '{city}', '{zip}', '{country}', '{id_user}' ) 
+            """
+            id_billing = updateData(sql)
+            response = {
+            'status': 1,
+            }
+        return jsonify(response)
+    else:
+         abort(make_response(jsonify(message="data user incorrect"), 401))
+
+
+
+@app.route('/api/update_plan_user', methods=['POST'])
+@jwt_required()
+def update_plan_user():
+    body = request.get_json()
+    payment = body["payment"]
+    plan = body["plan"]
+    amount = body["amount"]
+    tipo = 'mensual'
+    
+    id_user = get_jwt_identity()
+    if payment and plan and amount:
+        #buscar si existe 
+        sql = f"""
+        INSERT INTO mn_billing_payment_users ( amount, plan, paymentMethod, invoice, receipt, paymentDate, id_user) VALUES ( '{amount}',
+        '{plan}', '{payment}', 1, 1, '{date.today()}',  '{id_user}' ) 
+        """
+        id_billing = updateData(sql)
+        #ahora buscar la suscripcion.
+        sql = f"SELECT * FROM mn_subscription_users where id_user =  '{id_user}' order by id desc  "
+        getBilling = getDataOne(sql)
+        if getBilling:
+            #tiene suscripciones
+            print("ad")
+            if getBilling[5] == 1:
+                #sta activa la suscripcion por lo tanto esta pagando una nueva x ahora la sumo 
+                dateRenewal = getBilling[4]
+                dateHoy = dateRenewal.day
+                dateMes = dateRenewal.month + 1
+                dateAno = dateRenewal.year
+                dateRenewal = dateRenewal.replace(dateAno, dateMes, dateHoy)
+                print("new renewal: ", dateRenewal)
+                sql = f"""
+                update mn_subscription_users set renewalDate = '{dateRenewal}' where id = '{getBilling[0]}'
+                """
+                id_billing = updateData(sql)
+            else:
+                dateRenewal = datetime.now()
+                dateHoy = dateRenewal.day
+                dateMes = dateRenewal.month + 1
+                dateAno = dateRenewal.year
+                dateRenewal = dateRenewal.replace(dateAno, dateMes, dateHoy)
+                #no tiene por lo tanto le creo la nueva
+                sql = f"""
+                INSERT INTO mn_subscription_users ( plan, tipo, startDate, renewalDate,  id_user) VALUES ( '{plan}',
+                '{tipo}', '{datetime.now()}', '{dateRenewal}',  '{id_user}' ) 
+                """
+                id_billing = updateData(sql)
+        else:
+            dateRenewal = datetime.now()
+            dateHoy = dateRenewal.day
+            dateMes = dateRenewal.month + 1
+            dateAno = dateRenewal.year
+            dateRenewal = dateRenewal.replace(dateAno, dateMes, dateHoy)
+            #no tiene por lo tanto le creo la nueva
+            sql = f"""
+            INSERT INTO mn_subscription_users ( plan, tipo, startDate, renewalDate,  id_user) VALUES ( '{plan}',
+            '{tipo}', '{datetime.now()}', '{dateRenewal}',  '{id_user}' ) 
+            """
+            id_billing = updateData(sql)
+
+        sql = f"""
+        update mn_users set premium = '{plan}' where id = '{id_user}'
+        """
+        UpdteUser = updateData(sql)
+
+
+        response = {
+        'status': 1,
+        }
+        return jsonify(response)
+    else:
+         abort(make_response(jsonify(message="data user incorrect"), 401))
+
+
+
+@app.route('/api/get_user_billing_data', methods=["GET"])
+@jwt_required()
+def get_user_billing_data():
+    id_user = get_jwt_identity()
+    sql = f"SELECT * FROM mn_users_billing_data where id_user = '{id_user}'  "
+    getBilling = getDataOne(sql)
+
+    sql = f"SELECT * FROM mn_subscription_users where id_user = '{id_user}' order by id desc  "
+    getSuscription = getDataOne(sql)
+    if getSuscription:
+        activePlan = getSuscription[5]
+        renewalPlan = str(getSuscription[4])
+    else:
+        activePlan = ""
+        renewalPlan = ""
+
+
+    sql = f"SELECT * FROM mn_billing_payment_users where id_user = '{id_user}'  "
+    getPayments = getData(sql)
+    payments = []
+    if getPayments:
+        for row in getPayments:
+            amount = f"  {row[1]} $" 
+            if row[2] == 0:
+                plan = 'Limitado'
+            if row[2] == 2:
+                plan = 'Pro'
+            
+            payments.append({
+                "amount": amount,
+                "description": f"Plan {plan}",
+                "payment_date": str(row[6]),
+                "status":  ' <i class="fa fa-check" style="    color: rgb(61, 179, 158);" aria-hidden="true"></i>',
+            })
+    
+
+
+   
+    response = {
+            "status": 1,
+            "dataBilling": getBilling, 
+            "renewalPlan": renewalPlan,
+            "payments": payments, 
+            "activePlan": activePlan
+        }
+    return jsonify(response)
+
+
+    
 
 
 @app.route('/api/me', methods=['GET'])
@@ -219,6 +453,36 @@ def update_user_invitado():
     return jsonify(response)
 
 
+
+
+# update cookie user invitado
+@app.route('/api/cancel_user_suscription', methods=["POST"])
+@jwt_required()
+def cancel_user_suscription():
+    body = request.get_json()
+    id_user = get_jwt_identity()
+    sql = f"SELECT * FROM mn_subscription_users where id_user = '{id_user}'  "
+    getUserSub = getDataOne(sql)
+    if getUserSub:
+        active = getUserSub[5]
+        if active == 1:
+            active = 0
+        else:
+            active = 1
+        sql = f"""
+        update  mn_subscription_users set active = '{active}' where id_user = '{id_user}'
+        """
+        updateS = updateData(sql)
+        response = {
+            "active": active
+        }
+        return jsonify(response)
+    else:
+        abort(make_response(jsonify(message="data user incorrect"), 401))
+
+
+
+
 # user not registered
 @app.route('/api/events_not_registered', methods=['GET'])
 def events_not_registered():
@@ -283,6 +547,105 @@ def events_not_registered():
 # user registered
 
 
+
+# user not registered
+@app.route('/api/cron_cancel_suscription_users_by_cancel_method', methods=['GET'])
+def cron_cancel_suscription_users_by_cancel_method():
+    #buscar los usuarios q tengan la fecha de renovacion de hoy
+        
+    sql = f"SELECT * FROM mn_subscription_users where renewalDate =  '{date.today()}' and active = 0 and finalizado = 0"
+    getUsers = getData(sql)
+    if getUsers:
+        for user in getUsers:
+            #hay usuarios q se le acabo el plan q cancelaron la renovacion asi q los bajo de plan 
+            sql = f"""
+            update  mn_users set premium = 0 where id = '{user[7]}'  
+            """
+            updateUser = updateData(sql)
+
+            sql = f"""
+            update  mn_subscription_users set finalizado = 1, active = 0 where id = '{user[0]}'  
+            """
+            updateUser = updateData(sql)
+        response = {
+        "status": 1, 
+        "users": getUsers
+        }
+    else:
+        response = {
+        "status": 0 
+        }
+    
+    return jsonify(response)
+
+
+
+@app.route('/api/email_de_prueba', methods=['GET'])
+def email_de_prueba():
+    remitente = "Desde gnucita <ebahit@member.fsf.org>" 
+    destinatario = "Mama de Gnucita <tanner78x_w885d@kucix.com>" 
+    asunto = "E-mal HTML enviado desde Python" 
+    mensaje = """Hola!<br/> <br/> 
+    Este es un <b>e-mail</b> enviando desde <b>Python</b> 
+    """
+
+    email = """From: %s 
+    To: %s 
+    MIME-Version: 1.0 
+    Content-type: text/html 
+    Subject: %s 
+
+    %s
+    """ % (remitente, destinatario, asunto, mensaje) 
+    try: 
+        smtp = smtplib.SMTP('localhost') 
+        smtp.sendmail(remitente, destinatario, email) 
+        print("se envio bien")
+    except: 
+        print(F"error")
+
+    response = {
+        "status": 0 
+        }
+    
+    return jsonify(response)
+
+
+
+# user not registered
+@app.route('/api/cron_suscription_users_by_vencimiento', methods=['GET'])
+def cron_suscription_users_by_vencimiento():
+    #buscar los usuarios q tengan la fecha de renovacion de hoy
+        
+    sql = f""" 
+    SELECT * FROM mn_subscription_users where renewalDate <=  '{date.today()}' 
+    and active = 1 and finalizado = 0
+    """
+    print(sql)
+    getUsers = getData(sql)
+    if getUsers:
+        for user in getUsers:
+            dateVencida =  datetime.strptime(str(user[4]), '%Y-%m-%d').date()        #Ahora vamos a definir el día de hoy, la fecha actual.
+            today = date.today()
+            #Posterior a ello realizamos una resta entre estas fechas y lo convertimos a días.
+            remaining_days = (today - dateVencida).days
+
+            if remaining_days >=1: 
+                print("enviar mensaje por email y guardar notificacion")
+            #Finalmente mandamos a imprimir los días restantes
+            print(f"tiene {remaining_days} días de vencido")
+            response = {
+            "status": 1, 
+            "vencida": f"tiene {remaining_days} días de vencido"
+            }
+    else:
+        response = {
+        "status": 0 
+        }
+    
+    return jsonify(response)
+
+
 @app.route('/api/events_user_registered', methods=['GET'])
 @jwt_required()
 def events_user_registered():
@@ -322,6 +685,55 @@ def events_user_registered():
         }
 
     return jsonify(response)
+
+
+@app.route('/api/events_users_not_registered', methods=['GET'])
+def events_users_not_registered():
+    id_user = request.args.get('p', '')
+
+    sqlV = f"SELECT COUNT(*) FROM `mn_votos_choice` WHERE id_user = '{id_user}' "
+    cantVotos = getData(sqlV)
+    sql = f"SELECT * FROM mn_eventos where id_user = '{id_user}' order by id desc "
+    # buscar por uid las encuestas q tenga en la db
+    evento = getData(sql)
+
+    data = []
+    if evento:
+        for row in evento:
+            idEvento = row[0]
+            # buscar cantidad de votos
+            sqlVO = f"SELECT COUNT(*) FROM `mn_votos_choice` WHERE  id_evento = '{idEvento}' "
+            cantVotoO = getData(sqlVO)
+
+            data.append({
+                'id': row[0],
+                'titulo': row[1],
+                'codigo': row[3],
+                'fecha':   time_passed(str(row[8])),
+                'cantVoto': cantVotoO[0][0]
+            })
+
+        response = {
+            'eventos': data,
+            'cantVotos': cantVotos[0][0],
+            'cantEventos': len(evento),
+            'status': 1,
+        }
+
+    else:
+        response = {
+            'status': 0,
+        }
+
+    return jsonify(response)
+
+
+
+
+
+
+
+
 
 # funcion codigo aleatorio
 
