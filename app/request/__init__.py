@@ -636,12 +636,12 @@ def email_de_prueba():
     <td>
     <table id="content-3" cellpadding="0" cellspacing="0" align="center">
     <tr>
-        <td width="250" valign="top" bgcolor="d0d0d0" style="padding:5px;">
-        <img src="https://thumbsplus.tutsplus.com/uploads/users/30/posts/29520/preview_image/pre.png" width="250" height="150"  />
-    </td>
-        <td width="15"></td>
     <td width="250" valign="top" bgcolor="d0d0d0" style="padding:5px;">
-        <img src="https://cms-assets.tutsplus.com/uploads/users/30/posts/29642/preview_image/vue-2.png" width ="250" height="150" />
+    <img src="https://thumbsplus.tutsplus.com/uploads/users/30/posts/29520/preview_image/pre.png" width="250" height="150"  />
+    </td>
+    <td width="15"></td>
+    <td width="250" valign="top" bgcolor="d0d0d0" style="padding:5px;">
+    <img src="https://cms-assets.tutsplus.com/uploads/users/30/posts/29642/preview_image/vue-2.png" width ="250" height="150" />
     </td>
     </tr>
     </table>
@@ -652,13 +652,13 @@ def email_de_prueba():
     <table id="content-4" cellpadding="0" cellspacing="0" align="center">
     <tr>
     <td width="200" valign="top">
-        <h5>How to Get Up and Running With Vue</h5>
-        <p>In the introductory post for this series we spoke a little about how web designers can benefit by using Vue. In this tutorial we will learn how to get Vue up..</p>
+    <h5>How to Get Up and Running With Vue</h5>
+    <p>In the introductory post for this series we spoke a little about how web designers can benefit by using Vue. In this tutorial we will learn how to get Vue up..</p>
     </td>
     <td width="15"></td>
     <td width="200" valign="top">
-        <h5>Introducing Haiku: Design and Create Motion</h5>
-        <p>With motion on the rise amongst web developers so too are the tools that help to streamline its creation. Haiku is a stand-alone..</p>
+    <h5>Introducing Haiku: Design and Create Motion</h5>
+    <p>With motion on the rise amongst web developers so too are the tools that help to streamline its creation. Haiku is a stand-alone..</p>
     </td>
     </tr>
     </table>
@@ -687,13 +687,17 @@ def email_de_prueba():
     msg['Subject'] = 'Tutsplus Newsletter'
 
 
-    msg['From'] = 'hectoracosta5@gmail.com'
+    msg['From'] = 'emailresultapp@gmail.com'
     msg['To'] = emailTo
+    password = "199021utf8"
     msg.add_header('Content-Type', 'text/html')
     msg.set_payload(email_content)
 
-    s = smtplib.SMTP('localhost')
-    #s.starttls()
+    s = smtplib.SMTP('smtp.gmail.com: 587')
+    s.starttls()
+
+    # Login Credentials for sending the mail
+    s.login(msg['From'], password)
 
     s.sendmail(msg['From'], [msg['To']], msg.as_string())
 
