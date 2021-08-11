@@ -688,7 +688,7 @@ def email_de_prueba():
 
 
     msg['From'] = 'hectoracosta5@gmail.com'
-    msg['To'] = 'tanner78x_w885d@kucix.com'
+    msg['To'] = 'rafaelviajero222@gmail.com'
     msg.add_header('Content-Type', 'text/html')
     msg.set_payload(email_content)
 
