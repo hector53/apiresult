@@ -687,7 +687,7 @@ def email_de_prueba():
     msg['Subject'] = 'Tutsplus Newsletter'
 
 
-    msg['From'] = 'Result.app '
+    msg['From'] = "Result.app <emailresultapp@gmail.com>"
     msg['To'] = emailTo
     password = "199021utf8"
     msg.add_header('Content-Type', 'text/html')
