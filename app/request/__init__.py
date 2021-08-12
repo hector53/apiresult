@@ -1,4 +1,3 @@
-from os import name
 from flask import request, jsonify, abort, make_response, session
 from app import app
 from app import socketio
@@ -14,6 +13,8 @@ import json
 from dateutil import tz
 import smtplib
 import email.message
+import os
+import stripe
 
 from app.request.encuestas.multipleChoice import *
 from app.request.encuestas.nubeDePalabras import *
@@ -603,7 +604,7 @@ def email_de_prueba():
     """
 
     msg = email.message.Message()
-    msg['Subject'] = 'Tutsplus Newsletter'
+    msg['Subject'] = 'Customer Invoice'
 
 
     msg['From'] = "Result.app <emailresultapp@gmail.com>"
@@ -626,6 +627,87 @@ def email_de_prueba():
     
     return jsonify(response)
 
+#enviar email recordatorio vencimiento
+def email_recordatorio_vencimiento(usernames, amount, renewalDate, plan, tipo, id_user, emailTo):
+    email_content = f"""
+    <p style="text-align: justify;"><img src="https://result.app/img/Logoresult.jpg" alt="" width="300" height="85" /></p>
+    <p style="text-align: justify;">Dear {usernames} ,</p>
+    <p style="text-align: justify;">This is a notice that an invoice has been generated on {date.today()}.</p>
+    <p style="text-align: justify;">Amount Due: {amount} USD </p>
+    <p style="text-align: justify;">Due Date: {renewalDate}</p>
+    <p style="text-align: justify;"><strong>Invoice Items</strong></p>
+    ---------------------------------------
+    <p style="text-align: justify;">Plan {plan}</p>
+    ---------------------------------------
+    <p style="text-align: justify;">Regards,</p>
+    Result.app
+
+    """
+    sql = f"""
+    INSERT INTO mn_notificaciones_user ( mensaje, tipo, id_user, leida, enviada, date, datetime) VALUES ( '{email_content}',
+    '{tipo}', '{id_user}', 0, 1, '{date.today()}', '{datetime.now()}' ) 
+    """
+    id_dia = updateData(sql)
+    if id_dia:
+        msg = email.message.Message()
+        msg['Subject'] = 'Customer Invoice'
+
+
+        msg['From'] = "Result.app <emailresultapp@gmail.com>"
+        msg['To'] = emailTo
+        password = "199021utf8"
+        msg.add_header('Content-Type', 'text/html')
+        msg.set_payload(email_content)
+
+        s = smtplib.SMTP('smtp.gmail.com: 587')
+        s.starttls()
+
+        # Login Credentials for sending the mail
+        s.login('emailresultapp@gmail.com', password)
+
+        s.sendmail(msg['From'], [msg['To']], msg.as_string())
+
+
+#enviar email recordatorio vencimiento
+def email_desactivar_plan_vencimiento(usernames, amount, renewalDate, plan, tipo, id_user, emailTo):
+    email_content = f"""
+    <p style="text-align: justify;"><img src="https://result.app/img/Logoresult.jpg" alt="" width="300" height="85" /></p>
+    <p style="text-align: justify;">Dear {usernames} ,</p>
+    <p style="text-align: justify;">This is a notice that an invoice has been generated on {date.today()}.</p>
+    <p style="text-align: justify;">your current plan has been deactivated, because the corresponding payment has not been made after 3 days of surrender.</p>
+    <p style="text-align: justify;">Amount Due: {amount} USD </p>
+    <p style="text-align: justify;">Due Date: {renewalDate}</p>
+    <p style="text-align: justify;"><strong>Invoice Items</strong></p>
+    ---------------------------------------
+    <p style="text-align: justify;">Plan {plan}</p>
+    ---------------------------------------
+    <p style="text-align: justify;">Regards,</p>
+    Result.app
+
+    """
+    sql = f"""
+    INSERT INTO mn_notificaciones_user ( mensaje, tipo, id_user, leida, enviada, date, datetime) VALUES ( '{email_content}',
+    '{tipo}', '{id_user}', 0, 1, '{date.today()}', '{datetime.now()}' ) 
+    """
+    id_dia = updateData(sql)
+    if id_dia:
+        msg = email.message.Message()
+        msg['Subject'] = 'Customer Invoice'
+
+
+        msg['From'] = "Result.app <emailresultapp@gmail.com>"
+        msg['To'] = emailTo
+        password = "199021utf8"
+        msg.add_header('Content-Type', 'text/html')
+        msg.set_payload(email_content)
+
+        s = smtplib.SMTP('smtp.gmail.com: 587')
+        s.starttls()
+
+        # Login Credentials for sending the mail
+        s.login('emailresultapp@gmail.com', password)
+
+        s.sendmail(msg['From'], [msg['To']], msg.as_string())
 
 
 # user not registered
@@ -640,23 +722,55 @@ def cron_suscription_users_by_vencimiento():
     print(sql)
     getUsers = getData(sql)
     if getUsers:
+        #necesito los nombres del usuario 
+        
+
         for user in getUsers:
+            id_user = user[7]
+            sql = f""" 
+            SELECT * FROM mn_users where id = '{id_user}' 
+            """
+            dataUser = getDataOne(sql)
+            print(dataUser)
+            nombres = F"{dataUser[1]} {dataUser[2]}"
             dateVencida =  datetime.strptime(str(user[4]), '%Y-%m-%d').date()        #Ahora vamos a definir el día de hoy, la fecha actual.
             today = date.today()
             #Posterior a ello realizamos una resta entre estas fechas y lo convertimos a días.
             remaining_days = (today - dateVencida).days
 
             if remaining_days >=1: 
-                print("enviar mensaje por email y guardar notificacion")
+                if remaining_days == 4:
+                    sql = f"""
+                    update  mn_users set premium = 0 where id = '{user[7]}'  
+                    """
+                    updateUser = updateData(sql)
+
+                    sql = f"""
+                    update  mn_subscription_users set finalizado = 1, active = 0 where id = '{user[0]}'  
+                    """
+                    updateUser = updateData(sql)
+                    email_desactivar_plan_vencimiento(nombres, 11, dateVencida, "Pro", 0, id_user, dataUser[3])
+                    status = "Valio verga perdio su plan"
+                else:
+                    print("enviar mensaje por email y guardar notificacion")
+                    sql = f""" 
+                    SELECT * FROM mn_notificaciones_user where tipo = 0 and id_user = '{id_user}' and date =  '{date.today()}'   """
+                    print("notificaciones user", sql)
+                    getInvoiceHoy = getData(sql)
+                    if getInvoiceHoy:
+                        status = "Ya se le envio el recordatorio"
+                    else: 
+                        status = "no se le ha enviado nada entonces enviar la noti y el email"
+                        email_recordatorio_vencimiento(nombres, 11, dateVencida, "Pro", 0, id_user, dataUser[3])
             #Finalmente mandamos a imprimir los días restantes
             print(f"tiene {remaining_days} días de vencido")
             response = {
-            "status": 1, 
+            "status": status, 
             "vencida": f"tiene {remaining_days} días de vencido"
             }
     else:
         response = {
-        "status": 0 
+        "status": "y yo q se"
         }
     
     return jsonify(response)
@@ -1858,3 +1972,79 @@ def duplicar_evento_by_admin():
         return jsonify(response)
     else:
         abort(make_response(jsonify(message="data user incorrect"), 401))
+
+stripe.api_key = 'sk_test_51HGNaXEr1AtLuHUbEphu4qHosKqCeahKnkFVT2GoRcTTWWoxyfn3YGSd2L6juw8GU8Yx7CJdqZnrVdOP3kU2IK6P00TK7mDQ6O'
+price_id = 'price_1JNgROEr1AtLuHUbn73VnvUR'
+#stripe
+@app.route('/api/get_data_by_stripe', methods=['POST'])
+@jwt_required()
+def get_data_by_stripe():
+    id_user = get_jwt_identity()
+    sql = f"SELECT * FROM mn_users where id = '{id_user}'  "
+    userData = getDataOne(sql)
+    email = userData[3]
+    session = stripe.checkout.Session.create(
+    success_url='http://localhost:3000/upgrade/success?session_id={CHECKOUT_SESSION_ID}',
+    cancel_url='http://localhost:3000/upgrade/error',
+    customer_email=email,
+    payment_method_types=['card'],
+    mode='subscription',
+    line_items=[{
+    'price': price_id,
+    # For metered billing, do not pass quantity
+    'quantity': 1
+    }],
+    )
+    #guardar en la db le sesion generada al usuario para luego de pagado poder verificar si pago o no y aprobarle su suscripcion
+    sql = f"""
+    INSERT INTO mn_payment_intent_stripe ( id_sesion, id_user, amount, descripcion, date) VALUES ( '{session.id}',
+    '{id_user}', 11, 'Pago del plan Pro', '{datetime.now()}' ) 
+    """
+    actualizar = updateData(sql)
+    response = {
+        "status": 1, 
+        "redirect": session.url, 
+    }
+
+    return jsonify(response)
+
+
+@app.route('/webhook_stripe', methods=['POST'])
+def webhook_received():
+    webhook_secret = ''
+    request_data = json.loads(request.data)
+
+    if webhook_secret:
+        # Retrieve the event by verifying the signature using the raw body and secret if webhook signing is configured.
+        signature = request.headers.get('stripe-signature')
+        try:
+            event = stripe.Webhook.construct_event(
+                payload=request.data, sig_header=signature, secret=webhook_secret)
+            data = event['data']
+        except Exception as e:
+            return e
+        # Get the type of webhook event sent - used to check the status of PaymentIntents.
+        event_type = event['type']
+    else:
+        data = request_data['data']
+        event_type = request_data['type']
+    data_object = data['object']
+
+    if event_type == 'checkout.session.completed':
+    # Payment is successful and the subscription is created.
+    # You should provision the subscription and save the customer ID to your database.
+      print(data)
+    elif event_type == 'invoice.paid':
+    # Continue to provision the subscription as payments continue to be made.
+    # Store the status in your database and check when a user accesses your service.
+    # This approach helps you avoid hitting rate limits.
+      print(data)
+    elif event_type == 'invoice.payment_failed':
+    # The payment failed or the customer does not have a valid payment method.
+    # The subscription becomes past_due. Notify your customer and send them to the
+    # customer portal to update their payment information.
+      print(data)
+    else:
+      print('Unhandled event type {}'.format(event_type))
+
+    return jsonify({'status': 'success'})
