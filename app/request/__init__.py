@@ -202,72 +202,20 @@ def guardar_user_perfil_billing():
 @jwt_required()
 def update_plan_user():
     body = request.get_json()
-    payment = body["payment"]
-    plan = body["plan"]
-    amount = body["amount"]
-    tipo = 'mensual'
-    
+    session_id = body["session_id"]
     id_user = get_jwt_identity()
-    if payment and plan and amount:
+    if session_id:
         #buscar si existe 
-        sql = f"""
-        INSERT INTO mn_billing_payment_users ( amount, plan, paymentMethod, invoice, receipt, paymentDate, id_user) VALUES ( '{amount}',
-        '{plan}', '{payment}', 1, 1, '{date.today()}',  '{id_user}' ) 
-        """
-        id_billing = updateData(sql)
-        #ahora buscar la suscripcion.
-        sql = f"SELECT * FROM mn_subscription_users where id_user =  '{id_user}' order by id desc  "
-        getBilling = getDataOne(sql)
-        if getBilling:
-            #tiene suscripciones
-            print("ad")
-            if getBilling[5] == 1:
-                #sta activa la suscripcion por lo tanto esta pagando una nueva x ahora la sumo 
-                dateRenewal = getBilling[4]
-                dateHoy = dateRenewal.day
-                dateMes = dateRenewal.month + 1
-                dateAno = dateRenewal.year
-                dateRenewal = dateRenewal.replace(dateAno, dateMes, dateHoy)
-                print("new renewal: ", dateRenewal)
-                sql = f"""
-                update mn_subscription_users set renewalDate = '{dateRenewal}' where id = '{getBilling[0]}'
-                """
-                id_billing = updateData(sql)
-            else:
-                dateRenewal = datetime.now()
-                dateHoy = dateRenewal.day
-                dateMes = dateRenewal.month + 1
-                dateAno = dateRenewal.year
-                dateRenewal = dateRenewal.replace(dateAno, dateMes, dateHoy)
-                #no tiene por lo tanto le creo la nueva
-                sql = f"""
-                INSERT INTO mn_subscription_users ( plan, tipo, startDate, renewalDate,  id_user) VALUES ( '{plan}',
-                '{tipo}', '{datetime.now()}', '{dateRenewal}',  '{id_user}' ) 
-                """
-                id_billing = updateData(sql)
+        sql = f"SELECT * FROM mn_payment_intent_stripe where id_user =  '{id_user}' and id_sesion = '{session_id}' and pagado = 1  "
+        getPagado = getDataOne(sql)
+        if getPagado:
+            #ya esta pago envio la notificacion
+            response = {
+            'status': 1,
+            }
+            return jsonify(response)
         else:
-            dateRenewal = datetime.now()
-            dateHoy = dateRenewal.day
-            dateMes = dateRenewal.month + 1
-            dateAno = dateRenewal.year
-            dateRenewal = dateRenewal.replace(dateAno, dateMes, dateHoy)
-            #no tiene por lo tanto le creo la nueva
-            sql = f"""
-            INSERT INTO mn_subscription_users ( plan, tipo, startDate, renewalDate,  id_user) VALUES ( '{plan}',
-            '{tipo}', '{datetime.now()}', '{dateRenewal}',  '{id_user}' ) 
-            """
-            id_billing = updateData(sql)
-
-        sql = f"""
-        update mn_users set premium = '{plan}' where id = '{id_user}'
-        """
-        UpdteUser = updateData(sql)
-
-
-        response = {
-        'status': 1,
-        }
-        return jsonify(response)
+         abort(make_response(jsonify(message="payment intent not paid"), 401))
     else:
          abort(make_response(jsonify(message="data user incorrect"), 401))
 
@@ -1997,8 +1945,8 @@ def get_data_by_stripe():
     )
     #guardar en la db le sesion generada al usuario para luego de pagado poder verificar si pago o no y aprobarle su suscripcion
     sql = f"""
-    INSERT INTO mn_payment_intent_stripe ( id_sesion, id_user, amount, descripcion, date) VALUES ( '{session.id}',
-    '{id_user}', 11, 'Pago del plan Pro', '{datetime.now()}' ) 
+    INSERT INTO mn_payment_intent_stripe ( id_sesion, id_user, amount, descripcion, date, id_plan) VALUES ( '{session.id}',
+    '{id_user}', 11, 'Pago del plan Pro', '{datetime.now()}', 2 ) 
     """
     actualizar = updateData(sql)
     response = {
@@ -2033,8 +1981,38 @@ def webhook_received():
     if event_type == 'checkout.session.completed':
     # Payment is successful and the subscription is created.
     # You should provision the subscription and save the customer ID to your database.
+        sesionId = data_object["id"]
         customerId = data_object["customer"]
         print("customer id = ", customerId)
+        #buscar por al sesion id el intent registrado en la db y verificar q existe y de ahi necesito el id_user
+        sql2 = f"SELECT * FROM mn_payment_intent_stripe where id_sesion = {sesionId}  "
+        getSesionDb = getDataOne(sql2)
+        if getSesionDb:
+            id_plan = getSesionDb[7]
+            #coincide por lo tanto se realizo el pago correctamente 
+            id_user = getSesionDb[2]
+            sql2 = f"SELECT * FROM mn_users_billing_data id_user = '{id_user}' and customer_id = '{customerId}' "
+            getCustomer = getDataOne(sql2)
+            if getCustomer:
+                print("ya existe el customer seguramente esta metiendole mas plata al plan o otra cosa")
+            else:
+                #crear customer billing
+                sql = f"""
+                INSERT INTO mn_users_billing_data ( companyName, address, city, zip, country, id_user, customer_id ) 
+                VALUES
+                 ( '', '', '', '', '', '{id_user}', '{customerId}'  ) 
+                """
+                idUserBilling = updateData(sql)
+            #ahora actualizamos el plan del usuario 
+            sql = f"""
+            update mn_users set premium =  '{id_plan}'
+            """
+            updateUserPlan = updateData(sql)
+            #ahora pasamos el payment intent a pagado 
+            sql = f"""
+            update mn_payment_intent_stripe set pagado = 1 where id_sesion = {sesionId}
+            """
+            updateSesionPayment = updateData(sql)
         print(data)
     elif event_type == 'invoice.paid':
     # Continue to provision the subscription as payments continue to be made.
