@@ -1932,8 +1932,8 @@ def get_data_by_stripe():
     userData = getDataOne(sql)
     email = userData[3]
     session = stripe.checkout.Session.create(
-    success_url='http://localhost:3000/upgrade/success?session_id={CHECKOUT_SESSION_ID}',
-    cancel_url='http://localhost:3000/upgrade/error',
+    success_url=url_site+'/upgrade/success?session_id={CHECKOUT_SESSION_ID}',
+    cancel_url=url_site+'/upgrade/error',
     customer_email=email,
     payment_method_types=['card'],
     mode='subscription',
@@ -2010,7 +2010,7 @@ def webhook_received():
             updateUserPlan = updateData(sql)
             #ahora pasamos el payment intent a pagado 
             sql = f"""
-            update mn_payment_intent_stripe set pagado = 1 where id_sesion = {sesionId}
+            update mn_payment_intent_stripe set pagado = 1 where id_sesion = '{sesionId}'
             """
             updateSesionPayment = updateData(sql)
         print(data)
