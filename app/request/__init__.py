@@ -1956,6 +1956,30 @@ def get_data_by_stripe():
 
     return jsonify(response)
 
+@app.route('/api/get_portal_customer_by_user_id', methods=['POST'])
+@jwt_required()
+def get_portal_customer_by_user_id():
+    id_user = get_jwt_identity()
+    sql = f"SELECT * FROM mn_users_billing_data where id_user = '{id_user}'  "
+    userData = getDataOne(sql)
+    customer_id = userData[7]
+    return_url = 'https://result.app/dashboard'
+
+    session = stripe.billing_portal.Session.create(
+    customer=customer_id,
+    return_url=return_url,
+    )
+
+    # redirect to the URL for the session
+    #   return redirect(session.url, code=303)
+    response = {
+        "status": 1, 
+        "redirect": session.url, 
+    }
+
+    return jsonify(response)
+
+
 
 @app.route('/webhook_stripe', methods=['POST'])
 def webhook_received():
