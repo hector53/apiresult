@@ -101,7 +101,6 @@ def getSessionAndCodLive():
             print("el evento esta disabled")
             status = 2
             #esta deshabilitado enviar status 2
-            abort(make_response(jsonify(message="data user incorrect", status=2), 401))
         else:
             print("el evento no esta disabled")
             #esta bien enviar status 1
