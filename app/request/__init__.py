@@ -1922,7 +1922,7 @@ def duplicar_evento_by_admin():
         abort(make_response(jsonify(message="data user incorrect"), 401))
 
 stripe.api_key = 'sk_test_51HGNaXEr1AtLuHUbEphu4qHosKqCeahKnkFVT2GoRcTTWWoxyfn3YGSd2L6juw8GU8Yx7CJdqZnrVdOP3kU2IK6P00TK7mDQ6O'
-price_id = 'price_1JNgROEr1AtLuHUbn73VnvUR'
+price_id = 'price_1JO0CWEr1AtLuHUbYVeItAVX'
 #stripe
 @app.route('/api/get_data_by_stripe', methods=['POST'])
 @jwt_required()
