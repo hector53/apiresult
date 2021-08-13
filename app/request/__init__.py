@@ -89,6 +89,7 @@ def getSession():
 def getSessionAndCodLive():
     current_user_id = get_jwt_identity()
     cod = request.args.get('cod', '')
+    print("codigo", cod)
     # buscar si el usuario tiene ip
     sql = f"SELECT * FROM mn_users where id = '{current_user_id}' "
     buscarUser = getDataOne(sql)
