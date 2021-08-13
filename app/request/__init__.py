@@ -1934,18 +1934,35 @@ def get_data_by_stripe():
     sql = f"SELECT * FROM mn_users where id = '{id_user}'  "
     userData = getDataOne(sql)
     email = userData[3]
-    session = stripe.checkout.Session.create(
-    success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
-    cancel_url=url_site_front+'upgrade/error',
-    customer_email=email,
-    payment_method_types=['card'],
-    mode='subscription',
-    line_items=[{
-    'price': price_id,
-    # For metered billing, do not pass quantity
-    'quantity': 1
-    }],
-    )
+    customer = userData[12]
+    if customer != 0: 
+        session = stripe.checkout.Session.create(
+        success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url=url_site_front+'upgrade/error',
+        customer=customer,
+        customer_email=email,
+        payment_method_types=['card'],
+        mode='subscription',
+        line_items=[{
+        'price': price_id,
+        # For metered billing, do not pass quantity
+        'quantity': 1
+        }],
+        )
+    else:
+        session = stripe.checkout.Session.create(
+        success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url=url_site_front+'upgrade/error',
+        customer_email=email,
+        payment_method_types=['card'],
+        mode='subscription',
+        line_items=[{
+        'price': price_id,
+        # For metered billing, do not pass quantity
+        'quantity': 1
+        }],
+        )
+        
     #guardar en la db le sesion generada al usuario para luego de pagado poder verificar si pago o no y aprobarle su suscripcion
     sql = f"""
     INSERT INTO mn_payment_intent_stripe ( id_sesion, id_user, amount, descripcion, date, id_plan) VALUES ( '{session.id}',
