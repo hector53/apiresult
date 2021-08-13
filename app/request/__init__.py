@@ -1940,7 +1940,6 @@ def get_data_by_stripe():
         success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
         cancel_url=url_site_front+'upgrade/error',
         customer=customer,
-        customer_email=email,
         payment_method_types=['card'],
         mode='subscription',
         line_items=[{
