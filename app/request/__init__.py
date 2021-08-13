@@ -2049,6 +2049,19 @@ def webhook_received():
     # The subscription becomes past_due. Notify your customer and send them to the
     # customer portal to update their payment information.
       print(data)
+    elif event_type == 'customer.subscription.deleted':
+        #se cancelo la suscripcion actualizar la base de datos :D 
+        customerId = data_object["customer"]
+        sql2 = f"SELECT * FROM mn_users_billing_data where  customer_id = '{customerId}' "
+        getCustomer = getDataOne(sql2)
+        id_user = getCustomer[6]
+        sql = f"""
+        update mn_users set premium =  0 where id = '{id_user}'
+        """
+        updateUserPlan = updateData(sql)
+
+
+        print(data)
     else:
       print('Unhandled event type {}'.format(event_type))
 
