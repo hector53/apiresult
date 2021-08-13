@@ -108,7 +108,7 @@ def getSessionAndCodLive():
         response = {
             "status": status
         }
-        return jsonify(response)
+        return jsonify(response), 200
     else:
         #no existe enviar error
         abort(make_response(jsonify(message="data user incorrect"), 401))
