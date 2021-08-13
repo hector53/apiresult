@@ -97,14 +97,17 @@ def getSessionAndCodLive():
         #existe entonces busco el evento 
         sql = f"SELECT * FROM mn_eventos where codigo = '{cod}' and id_user = '{current_user_id}' "
         buscarEvento = getDataOne(sql)
-        if buscarEvento[9] == 1: 
-            print("el evento esta disabled")
-            status = 2
-            #esta deshabilitado enviar status 2
+        if buscarEvento:
+            if buscarEvento[9] == 1: 
+                print("el evento esta disabled")
+                status = 2
+                #esta deshabilitado enviar status 2
+            else:
+                print("el evento no esta disabled")
+                #esta bien enviar status 1
+                status = 1
         else:
-            print("el evento no esta disabled")
-            #esta bien enviar status 1
-            status = 1
+            status = 0
             
     else:
         #no existe enviar error
