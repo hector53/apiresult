@@ -1985,7 +1985,7 @@ def webhook_received():
         customerId = data_object["customer"]
         print("customer id = ", customerId)
         #buscar por al sesion id el intent registrado en la db y verificar q existe y de ahi necesito el id_user
-        sql2 = f"SELECT * FROM mn_payment_intent_stripe where id_sesion = {sesionId}  "
+        sql2 = f"SELECT * FROM mn_payment_intent_stripe where id_sesion = '{sesionId}'  "
         getSesionDb = getDataOne(sql2)
         if getSesionDb:
             id_plan = getSesionDb[7]
