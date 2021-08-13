@@ -7,7 +7,7 @@ datos = {
     "userPass":"nacho*123",
 }
 url_site = "https://api.result.app/"
-url_site_front = "https://api.result.app/"
+url_site_front = "https://result.app/"
 
 
 

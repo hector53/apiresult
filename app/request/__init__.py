@@ -1964,6 +1964,7 @@ def get_portal_customer_by_user_id():
     userData = getDataOne(sql)
     customer_id = userData[7]
     return_url = 'https://result.app/dashboard'
+    print("customer id", customer_id)
 
     session = stripe.billing_portal.Session.create(
     customer=customer_id,
