@@ -2079,8 +2079,17 @@ def webhook_received():
         update mn_users set premium =  0 where id = '{id_user}'
         """
         updateUserPlan = updateData(sql)
-
-
+        #deshablitar los eventos q tenga mayor a 5 
+        sql2 = f"SELECT * FROM mn_eventos where  id_user = '{id_user}' "
+        getEventos = getData(sql2)
+        i = 0
+        for row in getEventos:
+            if i >= 5:
+                sql = f"""
+                update mn_eventos set disabled =  1 where id = '{row[0]}'
+                """
+                disableEvento = updateData(sql)
+            i = i + 1
         print(data)
     else:
       print('Unhandled event type {}'.format(event_type))
