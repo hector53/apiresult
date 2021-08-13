@@ -1956,7 +1956,7 @@ def get_data_by_stripe():
 
     return jsonify(response)
 
-@app.route('/api/get_portal_customer_by_user_id', methods=['POST'])
+@app.route('/api/get_portal_customer_by_user_id', methods=['GET'])
 @jwt_required()
 def get_portal_customer_by_user_id():
     id_user = get_jwt_identity()
