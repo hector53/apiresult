@@ -73,6 +73,7 @@ def getSession():
     email = buscarUser[3]
     username = buscarUser[4]
     premium = buscarUser[10]
+    customerId = buscarUser[12]
     namePlan = ''
     if premium == 0:
         namePlan = 'Limitado'
@@ -80,7 +81,8 @@ def getSession():
         namePlan = 'Pro'
 
 
-    return jsonify({"id": current_user_id, "ip": ip, "firtsName": firtsName, "lastName": lastName, "email": email, "username": username, "premium": premium, "namePlan": namePlan }), 200
+    return jsonify({"id": current_user_id, "ip": ip, "firtsName": firtsName, "lastName": lastName, "email": email, "username": username,
+     "premium": premium, "namePlan": namePlan, "customerId": customerId }), 200
 
 
 @app.route('/api/get_user_settings', methods=['GET'])
@@ -2031,7 +2033,7 @@ def webhook_received():
                 idUserBilling = updateData(sql)
             #ahora actualizamos el plan del usuario 
             sql = f"""
-            update mn_users set premium =  '{id_plan}' where id = '{id_user}'
+            update mn_users set premium =  '{id_plan}', set customer_id = '{customerId}' where id = '{id_user}'
             """
             updateUserPlan = updateData(sql)
             #ahora pasamos el payment intent a pagado 
