@@ -2030,7 +2030,7 @@ def webhook_received():
                 idUserBilling = updateData(sql)
             #ahora actualizamos el plan del usuario 
             sql = f"""
-            update mn_users set premium =  '{id_plan}'
+            update mn_users set premium =  '{id_plan}' where id = '{id_user}'
             """
             updateUserPlan = updateData(sql)
             #ahora pasamos el payment intent a pagado 
