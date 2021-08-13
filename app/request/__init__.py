@@ -207,6 +207,7 @@ def update_plan_user():
     if session_id:
         #buscar si existe 
         sql = f"SELECT * FROM mn_payment_intent_stripe where id_user =  '{id_user}' and id_sesion = '{session_id}' and pagado = 1  "
+        print(sql)
         getPagado = getDataOne(sql)
         if getPagado:
             #ya esta pago envio la notificacion
