@@ -1150,6 +1150,12 @@ def get_event_by_cod_front():
     evento = getDataOne(sql)
     if evento:
         id_evento = evento[0]
+        if evento[9] == 1:
+            response = {
+            "status": 0,
+            }
+            return jsonify(response)
+
         # listar las encuestas para enviarlas de una vez
         sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' order by posicion asc  "
         # buscar por uid las encuestas q tenga en la db
