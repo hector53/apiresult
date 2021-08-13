@@ -1991,7 +1991,7 @@ def webhook_received():
             id_plan = getSesionDb[7]
             #coincide por lo tanto se realizo el pago correctamente 
             id_user = getSesionDb[2]
-            sql2 = f"SELECT * FROM mn_users_billing_data id_user = '{id_user}' and customer_id = '{customerId}' "
+            sql2 = f"SELECT * FROM mn_users_billing_data where id_user = '{id_user}' and customer_id = '{customerId}' "
             getCustomer = getDataOne(sql2)
             if getCustomer:
                 print("ya existe el customer seguramente esta metiendole mas plata al plan o otra cosa")
