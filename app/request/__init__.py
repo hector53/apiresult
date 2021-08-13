@@ -749,6 +749,7 @@ def events_user_registered():
                 'id': row[0],
                 'titulo': row[1],
                 'codigo': row[3],
+                'disabled': row[9],
                 'fecha':   time_passed(str(row[8])),
                 'cantVoto': cantVotoO[0][0]
             })
