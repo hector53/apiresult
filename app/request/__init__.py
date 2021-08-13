@@ -84,6 +84,35 @@ def getSession():
     return jsonify({"id": current_user_id, "ip": ip, "firtsName": firtsName, "lastName": lastName, "email": email, "username": username,
      "premium": premium, "namePlan": namePlan, "customerId": customerId }), 200
 
+@app.route('/api/getSessionAndCodLive', methods=['GET'])
+@jwt_required()
+def getSessionAndCodLive():
+    current_user_id = get_jwt_identity()
+    cod = request.args.get('cod', '')
+    # buscar si el usuario tiene ip
+    sql = f"SELECT * FROM mn_users where id = '{current_user_id}' "
+    buscarUser = getDataOne(sql)
+    if buscarUser:
+        #existe entonces busco el evento 
+        sql = f"SELECT * FROM mn_eventos where codigo = '{cod}' "
+        buscarEvento = getDataOne(sql)
+        if buscarEvento[9] == 1: 
+            status = 2
+            #esta deshabilitado enviar status 2
+        else:
+            #esta bien enviar status 1
+            status = 1
+        response = {
+            "status": status
+        }
+        return jsonify(response), 200
+    else:
+        #no existe enviar error
+        abort(make_response(jsonify(message="data user incorrect"), 401))
+
+
+    
+
 
 @app.route('/api/get_user_settings', methods=['GET'])
 @jwt_required()
@@ -2081,7 +2110,7 @@ def webhook_received():
         """
         updateUserPlan = updateData(sql)
         #deshablitar los eventos q tenga mayor a 5 
-        sql2 = f"SELECT * FROM mn_eventos where  id_user = '{id_user}' "
+        sql2 = f"SELECT * FROM mn_eventos where  id_user = '{id_user}' order by id asc "
         getEventos = getData(sql2)
         i = 0
         for row in getEventos:
