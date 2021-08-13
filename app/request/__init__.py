@@ -1582,6 +1582,12 @@ def get_event_by_cod():
     evento = getDataOne(sql)
     if evento:
         id_evento = evento[0]
+        if evento[9] == 1:
+            response = {
+            "status": 0,
+            }
+            return jsonify(response)
+
         sql = f"SELECT * FROM mn_tipo_encuesta where id_evento = '{id_evento}' order by posicion asc  "
         # buscar por uid las encuestas q tenga en la db
         encuestas = getData(sql)
