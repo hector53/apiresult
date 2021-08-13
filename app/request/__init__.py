@@ -1966,7 +1966,7 @@ def get_portal_customer_by_user_id():
     sql = f"SELECT * FROM mn_users_billing_data where id_user = '{id_user}'  "
     userData = getDataOne(sql)
     customer_id = userData[7]
-    return_url = 'https://result.app/dashboard'
+    return_url = url_site_front+'dashboard'
     print("customer id", customer_id)
 
     session = stripe.billing_portal.Session.create(
@@ -2033,7 +2033,7 @@ def webhook_received():
                 idUserBilling = updateData(sql)
             #ahora actualizamos el plan del usuario 
             sql = f"""
-            update mn_users set premium =  '{id_plan}', set customer_id = '{customerId}' where id = '{id_user}'
+            update mn_users set premium =  '{id_plan}', customer_id = '{customerId}' where id = '{id_user}'
             """
             updateUserPlan = updateData(sql)
             #ahora pasamos el payment intent a pagado 
