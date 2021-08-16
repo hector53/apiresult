@@ -1982,59 +1982,65 @@ def duplicar_evento_by_admin():
 @app.route('/api/get_data_by_stripe', methods=['POST'])
 @jwt_required()
 def get_data_by_stripe():
+    body = request.get_json()
+    plan = body["plan"]
     id_user = get_jwt_identity()
     sql = f"SELECT * FROM mn_users where id = '{id_user}'  "
     userData = getDataOne(sql)
     email = userData[3]
     customer = userData[12]
-    if customer == '0':
-        session = stripe.Subscription.create(
-        success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
-        cancel_url=url_site_front+'upgrade/error',
-        customer_email=email,
-        payment_method_types=['card'],
-        mode='subscription',
-        items=[
-        {
-        'price': 'price_1JPC1hD8x9NGALumh0tXkYOC',
-        },
-        {
-        'price': 'price_1JPC1hD8x9NGALum2GYgj1qh',
-        },
-        ]
-        )
+    if plan == "Mensual" or plan == "Anual":
+        if plan == "Mensual":
+            priceUsar = "price_1JPC1hD8x9NGALumh0tXkYOC"
+        if plan == "Anual":
+            priceUsar = "price_1JPC1hD8x9NGALum2GYgj1qh"
+        if customer == '0':
+            session = stripe.checkout.Session.create(
+            success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_site_front+'upgrade/error',
+            customer_email=email,
+            payment_method_types=['card'],
+            mode='subscription',
+            line_items=[{
+            'price': priceUsar,
+            # For metered billing, do not pass quantity
+            'quantity': 1
+            }, 
+            ],
+            )
+        else:
+            print("customer = ", customer)
+            session = stripe.checkout.Session.create(
+            success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_site_front+'upgrade/error',
+            customer=customer,
+            payment_method_types=['card'],
+            mode='subscription',
+            line_items=[{
+            'price': priceUsar,
+            # For metered billing, do not pass quantity
+            'quantity': 1
+            }, 
+            ],
+            )
+            
+            
+            
+        #guardar en la db le sesion generada al usuario para luego de pagado poder verificar si pago o no y aprobarle su suscripcion
+        sql = f"""
+        INSERT INTO mn_payment_intent_stripe ( id_sesion, id_user, amount, descripcion, date, id_plan) VALUES ( '{session.id}',
+        '{id_user}', 11, 'Pago del plan Pro', '{datetime.now()}', 2 ) 
+        """
+        actualizar = updateData(sql)
+        response = {
+            "status": 1, 
+            "redirect": session.url, 
+        }
+        return jsonify(response)
     else:
-        print("customer = ", customer)
-        session = stripe.Subscription.create(
-        success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
-        cancel_url=url_site_front+'upgrade/error',
-        customer=customer,
-        payment_method_types=['card'],
-        mode='subscription',
-        items=[
-        {
-        'price': 'price_1JPC1hD8x9NGALumh0tXkYOC',
-        },
-        {
-        'price': 'price_1JPC1hD8x9NGALum2GYgj1qh',
-        },
-        ]
-        )
-        
-        
-        
-    #guardar en la db le sesion generada al usuario para luego de pagado poder verificar si pago o no y aprobarle su suscripcion
-    sql = f"""
-    INSERT INTO mn_payment_intent_stripe ( id_sesion, id_user, amount, descripcion, date, id_plan) VALUES ( '{session.id}',
-    '{id_user}', 11, 'Pago del plan Pro', '{datetime.now()}', 2 ) 
-    """
-    actualizar = updateData(sql)
-    response = {
-        "status": 1, 
-        "redirect": session.url, 
-    }
+        abort(make_response(jsonify(message="data user incorrect"), 401))
 
-    return jsonify(response)
+    
 
 @app.route('/api/get_portal_customer_by_user_id', methods=['GET'])
 @jwt_required()
