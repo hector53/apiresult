@@ -1995,10 +1995,16 @@ def get_data_by_stripe():
         payment_method_types=['card'],
         mode='subscription',
         line_items=[{
-        'price': price_id,
+        'price': 'price_1JPC1hD8x9NGALumh0tXkYOC',
         # For metered billing, do not pass quantity
         'quantity': 1
-        }],
+        }, 
+        {
+        'price': 'price_1JPC1hD8x9NGALum2GYgj1qh',
+        # For metered billing, do not pass quantity
+        'quantity': 1
+        }
+        ],
         )
     else:
         print("customer = ", customer)
