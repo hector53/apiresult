@@ -24,6 +24,9 @@ from app.request.encuestas.qya import *
 from app.request.socketRequest import *
 
 
+stripe.api_key = 'sk_test_51JPBa7D8x9NGALumLFYMEMSJjQBtdlRMjUQKqKc2krlX9SWb7I42g2IdarThKSO35P54gGkEOsEKSr7E0g6oHE9200yFd9j07Q'
+price_id = 'price_1JPBjeD8x9NGALumLleXjgLP'
+
 mesFecha = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
             "Oct", "Nov", "Dic"]
 
@@ -1974,8 +1977,7 @@ def duplicar_evento_by_admin():
     else:
         abort(make_response(jsonify(message="data user incorrect"), 401))
 
-stripe.api_key = 'sk_test_51HGNaXEr1AtLuHUbEphu4qHosKqCeahKnkFVT2GoRcTTWWoxyfn3YGSd2L6juw8GU8Yx7CJdqZnrVdOP3kU2IK6P00TK7mDQ6O'
-price_id = 'price_1JO0CWEr1AtLuHUbYVeItAVX'
+
 #stripe
 @app.route('/api/get_data_by_stripe', methods=['POST'])
 @jwt_required()
