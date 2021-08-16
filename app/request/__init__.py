@@ -25,7 +25,7 @@ from app.request.socketRequest import *
 
 
 stripe.api_key = 'sk_test_51JPBa7D8x9NGALumLFYMEMSJjQBtdlRMjUQKqKc2krlX9SWb7I42g2IdarThKSO35P54gGkEOsEKSr7E0g6oHE9200yFd9j07Q'
-price_id = 'price_1JPBjeD8x9NGALumLleXjgLP'
+price_id = 'price_1JPC1hD8x9NGALum2GYgj1qh'
 
 mesFecha = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep",
             "Oct", "Nov", "Dic"]
