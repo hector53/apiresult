@@ -1987,11 +1987,11 @@ def get_data_by_stripe():
     userData = getDataOne(sql)
     email = userData[3]
     customer = userData[12]
-    if customer:
+    if customer == 0:
         session = stripe.checkout.Session.create(
         success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
         cancel_url=url_site_front+'upgrade/error',
-        customer=customer,
+        customer_email=email,
         payment_method_types=['card'],
         mode='subscription',
         line_items=[{
@@ -2004,7 +2004,7 @@ def get_data_by_stripe():
         session = stripe.checkout.Session.create(
         success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
         cancel_url=url_site_front+'upgrade/error',
-        customer_email=email,
+        customer=customer,
         payment_method_types=['card'],
         mode='subscription',
         line_items=[{
