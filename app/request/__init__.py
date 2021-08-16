@@ -1988,7 +1988,7 @@ def get_data_by_stripe():
     email = userData[3]
     customer = userData[12]
     if customer == '0':
-        session = stripe.checkout.Session.create(
+        session = stripe.Subscription.create(
         success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
         cancel_url=url_site_front+'upgrade/error',
         customer_email=email,
@@ -2005,7 +2005,7 @@ def get_data_by_stripe():
         )
     else:
         print("customer = ", customer)
-        session = stripe.checkout.Session.create(
+        session = stripe.Subscription.create(
         success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
         cancel_url=url_site_front+'upgrade/error',
         customer=customer,
