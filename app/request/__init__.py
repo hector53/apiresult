@@ -1995,6 +1995,7 @@ def get_data_by_stripe():
         if plan == "Anual":
             priceUsar = "price_1JPC1hD8x9NGALum2GYgj1qh"
         if customer == '0':
+            print("customer es igual a cero")
             session = stripe.checkout.Session.create(
             success_url=url_site_front+'upgrade/success?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=url_site_front+'upgrade/error',

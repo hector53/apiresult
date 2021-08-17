@@ -1,5 +1,5 @@
 #datos produccion
-
+"""
 datos = {
    "host":"localhost",
     "database":"minipoll",
@@ -8,11 +8,11 @@ datos = {
 }
 url_site = "https://api.result.app/"
 url_site_front = "https://result.app/"
-
+"""
 
 
 #datos localhost
-"""
+
 datos = {
     "host":"localhost",
     "database":"minipoll",
@@ -22,7 +22,7 @@ datos = {
 
 url_site = "http://127.0.0.1:5000/"
 url_site_front = "http://127.0.0.1:3000/"
-"""
+
 
 
 #datos Host para db
