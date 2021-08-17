@@ -2041,9 +2041,9 @@ def get_data_by_stripe():
 @jwt_required()
 def get_portal_customer_by_user_id():
     id_user = get_jwt_identity()
-    sql = f"SELECT * FROM mn_users_billing_data where id_user = '{id_user}'  "
+    sql = f"SELECT * FROM mn_users where id = '{id_user}'  "
     userData = getDataOne(sql)
-    customer_id = userData[7]
+    customer_id = userData[12]
     return_url = url_site_front+'dashboard'
     print("customer id", customer_id)
 
