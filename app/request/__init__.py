@@ -51,7 +51,20 @@ def login():
         }
         return jsonify(person1)
     else:
-        abort(make_response(jsonify(message="data user incorrect"), 401))
+        sql = f"SELECT * FROM mn_users where username = '{email}' and pass = '{password}'  "
+        getUser = getDataOne(sql)
+        if getUser:
+            access_token = create_access_token(identity=getUser[0])
+            person1 = {
+            "id": getUser[0],
+            "name": getUser[1]+' '+getUser[2],
+            "email": getUser[3],
+            "username": getUser[4],
+            "token": access_token
+            }
+            return jsonify(person1)
+        else:
+            abort(make_response(jsonify(message="data user incorrect"), 401))
 
 
 @app.route('/api/set', methods=['GET'])

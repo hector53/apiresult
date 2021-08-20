@@ -192,6 +192,7 @@ def edit_diayhora_live():
     codigo = body["codigo"]
     activar = body["activar"]
     id_tipo_encuesta = body["id_encuesta"]
+    playEncuesta=0
 
     id_user = get_jwt_identity()
     # METHOD 1: Hardcode zones:
@@ -201,125 +202,142 @@ def edit_diayhora_live():
     evento = getDataOne(sql)
     if evento:
         id_evento = evento[0]
-        idsDiaNoBorrar = []
-        idsHoraNoBorrar = []
-        for d in horasArray:
-            idDb = d['idDb']
-            fechaDia = d['id']
-            if idDb == 0:
-                # inserto
-                sql = f"""
-                                INSERT INTO mn_date_day ( fecha, id_encuesta) VALUES ( '{fechaDia}',
-                                '{id_tipo_encuesta}' ) 
-                                """
-                id_dia = updateData(sql)
-                idsDiaNoBorrar.append(id_dia)
-                for h in d['horas']:
-                    horaini = h['ini']
-                    horaini = datetime.strptime(
-                        horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
-                    #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
-                    utc = horaini.replace(tzinfo=from_zone)
-                    central = utc.astimezone(to_zone)
-                    print(central)
-                    horaini = str(central)
-
-                    sql = f"""
-                                        INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{horaini[:19]}',
-                                        '{id_dia}', '{id_tipo_encuesta}' ) 
-                                        """
-                    id_hora = updateData(sql)
-                    idsHoraNoBorrar.append(id_hora)
-            else:
-                # editar
-                print("editar horas")
-                idsDiaNoBorrar.append(idDb)
-                for h in d['horas']:
-                    idHoraDb = h['id']
-                    if idHoraDb == 0:
-                        # inserto
-                        horaini = h['ini']
-                        horaini = datetime.strptime(
-                            horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
-                        #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
-                        utc = horaini.replace(tzinfo=from_zone)
-                        central = utc.astimezone(to_zone)
-                        print(central)
-                        horaini = str(central)
-
-                        sql = f"""
-                                                INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{horaini[:19]}',
-                                                '{idDb}', '{id_tipo_encuesta}' ) 
-                                                """
-                        id_hora = updateData(sql)
-                        idsHoraNoBorrar.append(id_hora)
-                    else:
-                        print("editar hora")
-                        # edito
-                        horaini = h['ini']
-                        horaini = datetime.strptime(
-                            horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
-                        #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
-                        utc = horaini.replace(tzinfo=from_zone)
-                        central = utc.astimezone(to_zone)
-                        print(central)
-                        horaini = str(central)
-
-                        sql = f"""
-                                                update mn_date_horas set hora = '{horaini[:19]}' where id = '{idHoraDb}' 
-                                                """
-                        id_hora = updateData(sql)
-                        idsHoraNoBorrar.append(idHoraDb)
-
-        # borrar los ids q no esten incluidos en el array de dias y horas
-        #arrayT = [2,3,4,5,6]
-        notBorrar = ''
-        f = 1
-
-        for t in idsDiaNoBorrar:
-            if f == len(idsDiaNoBorrar):
-                notBorrar = notBorrar + str(t)
-            else:
-                notBorrar = notBorrar + str(t) + ','
-            f = f+1
-
-        sql = f"""
-                delete from mn_date_day where id not in ({notBorrar}) and id_encuesta = '{id_tipo_encuesta}'
-                """
-        print(sql)
-        borrarSobrantes = updateData(sql)
-
-        notBorrar = ''
-        f = 1
-
-        for t in idsHoraNoBorrar:
-            if f == len(idsHoraNoBorrar):
-                notBorrar = notBorrar + str(t)
-            else:
-                notBorrar = notBorrar + str(t) + ','
-            f = f+1
-
-        sql = f"""
-                delete from mn_date_horas where id not in ({notBorrar}) and id_encuesta = '{id_tipo_encuesta}'
-                """
-        print(sql)
-        borrarSobrantes = updateData(sql)
-
-        sql = f"""
-                delete from mn_date_horas_votos where id_date_hora not in ({notBorrar}) and id_tipo_encuesta = '{id_tipo_encuesta}'
-                """
-        print(sql)
-        borrarSobrantes = updateData(sql)
-
-        sql = f"SELECT * FROM mn_tipo_encuesta where  id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}' "
-        tipoEncuesta = getDataOne(sql)
-        playEncuesta = tipoEncuesta[6]
-
         sql = f"""
         update mn_tipo_encuesta set titulo = '{titulo}' where 
         id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}'
         """
         tipoEncuesta = updateData(sql)
+
+        if len(horasArray)==0:
+            print("hacer algo")
+            sql = f"""
+            delete from mn_date_day where id_encuesta = '{id_tipo_encuesta}' 
+            """
+            borrarSobrantes = updateData(sql)
+            sql = f"""
+            delete from mn_date_horas where  id_encuesta = '{id_tipo_encuesta}'
+            """
+            borrarSobrantes = updateData(sql)
+            sql = f"""
+            delete from mn_date_horas_votos where  id_tipo_encuesta = '{id_tipo_encuesta}' and id_user = '{id_user}'
+            """
+            borrarSobrantes = updateData(sql)
+        else:
+            idsDiaNoBorrar = []
+            idsHoraNoBorrar = []
+            for d in horasArray:
+                idDb = d['idDb']
+                fechaDia = d['id']
+                if idDb == 0:
+                    # inserto
+                    sql = f"""
+                                    INSERT INTO mn_date_day ( fecha, id_encuesta) VALUES ( '{fechaDia}',
+                                    '{id_tipo_encuesta}' ) 
+                                    """
+                    id_dia = updateData(sql)
+                    idsDiaNoBorrar.append(id_dia)
+                    for h in d['horas']:
+                        horaini = h['ini']
+                        horaini = datetime.strptime(
+                            horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                        #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+                        utc = horaini.replace(tzinfo=from_zone)
+                        central = utc.astimezone(to_zone)
+                        print(central)
+                        horaini = str(central)
+
+                        sql = f"""
+                                            INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{horaini[:19]}',
+                                            '{id_dia}', '{id_tipo_encuesta}' ) 
+                                            """
+                        id_hora = updateData(sql)
+                        idsHoraNoBorrar.append(id_hora)
+                else:
+                    # editar
+                    print("editar horas")
+                    idsDiaNoBorrar.append(idDb)
+                    for h in d['horas']:
+                        idHoraDb = h['id']
+                        if idHoraDb == 0:
+                            # inserto
+                            horaini = h['ini']
+                            horaini = datetime.strptime(
+                                horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                            #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+                            utc = horaini.replace(tzinfo=from_zone)
+                            central = utc.astimezone(to_zone)
+                            print(central)
+                            horaini = str(central)
+
+                            sql = f"""
+                                                    INSERT INTO mn_date_horas ( hora, id_date_day, id_encuesta) VALUES ( '{horaini[:19]}',
+                                                    '{idDb}', '{id_tipo_encuesta}' ) 
+                                                    """
+                            id_hora = updateData(sql)
+                            idsHoraNoBorrar.append(id_hora)
+                        else:
+                            print("editar hora")
+                            # edito
+                            horaini = h['ini']
+                            horaini = datetime.strptime(
+                                horaini, '%Y-%m-%dT%H:%M:%S.%f%z')
+                            #utc = datetime.strptime(str(horaini), '%Y-%m-%d %H:%M:%S')
+                            utc = horaini.replace(tzinfo=from_zone)
+                            central = utc.astimezone(to_zone)
+                            print(central)
+                            horaini = str(central)
+
+                            sql = f"""
+                                                    update mn_date_horas set hora = '{horaini[:19]}' where id = '{idHoraDb}' 
+                                                    """
+                            id_hora = updateData(sql)
+                            idsHoraNoBorrar.append(idHoraDb)
+
+            # borrar los ids q no esten incluidos en el array de dias y horas
+            #arrayT = [2,3,4,5,6]
+            notBorrar = ''
+            f = 1
+
+            for t in idsDiaNoBorrar:
+                if f == len(idsDiaNoBorrar):
+                    notBorrar = notBorrar + str(t)
+                else:
+                    notBorrar = notBorrar + str(t) + ','
+                f = f+1
+
+            sql = f"""
+                    delete from mn_date_day where id not in ({notBorrar}) and id_encuesta = '{id_tipo_encuesta}'
+                    """
+            print(sql)
+            borrarSobrantes = updateData(sql)
+
+            notBorrar = ''
+            f = 1
+
+            for t in idsHoraNoBorrar:
+                if f == len(idsHoraNoBorrar):
+                    notBorrar = notBorrar + str(t)
+                else:
+                    notBorrar = notBorrar + str(t) + ','
+                f = f+1
+
+            sql = f"""
+                    delete from mn_date_horas where id not in ({notBorrar}) and id_encuesta = '{id_tipo_encuesta}'
+                    """
+            print(sql)
+            borrarSobrantes = updateData(sql)
+
+            sql = f"""
+                    delete from mn_date_horas_votos where id_date_hora not in ({notBorrar}) and id_tipo_encuesta = '{id_tipo_encuesta}'
+                    """
+            print(sql)
+            borrarSobrantes = updateData(sql)
+
+            sql = f"SELECT * FROM mn_tipo_encuesta where  id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id_tipo_encuesta}' "
+            tipoEncuesta = getDataOne(sql)
+            playEncuesta = tipoEncuesta[6]
+
+        
 
 
 

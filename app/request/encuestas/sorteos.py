@@ -22,6 +22,11 @@ def create_sorteo_live():
     codigo = body["codigo"]
     activar = body["activar"]
     id_user = get_jwt_identity()
+    id_encuesta = body["id_encuesta"]
+    if id_encuesta==0: 
+        print("es nuevo")
+    else:
+        print("hay q editar")
 
     sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
     evento = getDataOne(sql)
@@ -167,8 +172,20 @@ def edit_sorteo_live_modal():
 
         
 
+        # buscar participantes
+        sql2 = f"SELECT * FROM mn_sorteos_participantes where id_encuesta = {id_encuesta}  "
+        participantes = getData(sql2)
+        # ahora buscar si ya como usuario envie mi respeusta
+        integrantes = []
+        for row in participantes:
+            integrantes.append({
+                'id': row[0],
+                'value': row[1],
+            })
+
         response = {
             'status': 1,
+            'participantes': integrantes
         }
     else:
         response = {
@@ -212,6 +229,52 @@ def get__sorteo_by_id_encuesta_modal():
 
 @app.route('/api/sortear_sorteo_live', methods=['POST'])
 def sortear_sorteo_live():
+    body = request.get_json()
+    print(body)
+    participantes = body["participantes"]
+    participantes = json.loads(participantes)
+    cantParticipantes = len(participantes)
+    premios = body["premios"]
+    codigo = body["codigo"]
+    id_encuesta = body["id_encuesta"]
+    ganadores = []
+    while len(ganadores) < int(premios):
+        # generamos numero aleatorio
+        n = random.randint(1, cantParticipantes)
+        if n not in ganadores:
+            # si no existe lo agrego
+            ganadores.append({"id": 0, "value": participantes[(n-1)]})
+            # update table participantes al ganador
+        #    print("ganador", participantes[(n-1)]['id'])
+            sql = f"""
+                        update mn_sorteos_participantes set ganador = 1 where 
+                        value = '{participantes[(n-1)]}' 
+                        """
+            guardarGanador = updateData(sql)
+
+    socketio.emit('generarGanadorSorteo', {
+                  "ganadores": ganadores, "msj": "generando ganadores", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
+    # buscar participantes
+    sql2 = f"SELECT * FROM mn_sorteos_participantes where id_encuesta = {id_encuesta}  "
+    participantes = getData(sql2)
+    # ahora buscar si ya como usuario envie mi respeusta
+    integrantes = []
+    for row in participantes:
+        integrantes.append({
+        'id': row[0],
+        'value': row[1],
+        })
+    response = {
+        'status': 1,
+        'participantes': integrantes,
+        'ganadores': ganadores
+    }
+
+    return jsonify(response)
+
+
+@app.route('/api/sortear_sorteo_live_real', methods=['POST'])
+def sortear_sorteo_live_real():
     body = request.get_json()
     print(body)
     participantes = body["participantes"]
