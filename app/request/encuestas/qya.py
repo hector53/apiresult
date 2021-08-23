@@ -146,11 +146,11 @@ def add_qya_live_front():
     id_qya = updateData(sql)
     if modoLive == 1:
         print("cambo de encuesta aiadjsouasdoisadhsadijsadihijlsadd")
-        socketio.emit('cambioDeEncuesta', {
-                      "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
+        socketio.emit('addRespuestaQyA', {
+                      "msj": "agregando respuesta qya", "codigo": codigo, "id_encuesta": id_encuesta, "modoLive": modoLive}, to=codigo)
     else:
-        socketio.emit('cambioDeEncuesta', {
-                      "tipo": 6, "tipoEncuesta": 5, "msj": "actualizar encuesta modo normal", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
+        socketio.emit('addRespuestaQyA', {
+                        "msj": "agregando respuesta qya", "codigo": codigo, "id_encuesta": id_encuesta,  "modoLive": modoLive}, to=codigo)
     socketio.emit('respuestaDelVoto', {
                   "tipo": 5, "id_evento": id_evento, "msj": "Nueva pregunta", "id_encuesta": id_encuesta}, to=codigo)
 
@@ -287,11 +287,11 @@ def delete_qya_live_admin():
 
         if modoLive == 1:
             print("cambo de encuesta aiadjsouasdoisadhsadijsadihijlsadd")
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
+            socketio.emit('borrandoPreguntaQyA', {
+                      "msj": "borrando una pregunta qya desde el admin", "codigo": codigo, "id_encuesta": id_encuesta, "modoLive": modoLive}, to=codigo)
         else:
-            socketio.emit('cambioDeEncuesta', {
-                          "tipo": 6, "tipoEncuesta": 5, "msj": "actualizar encuesta modo normal", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
+            socketio.emit('borrandoPreguntaQyA', {
+                      "msj": "borrando una pregunta qya desde el admin", "codigo": codigo, "id_encuesta": id_encuesta, "modoLive": modoLive}, to=codigo)
         socketio.emit('respuestaDelVoto', {
                       "tipo": 5, "id_evento": id_evento, "msj": "borre una pregunta", "id_encuesta": id_encuesta}, to=codigo)
     else:
