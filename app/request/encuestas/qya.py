@@ -1,4 +1,4 @@
-from flask import request, jsonify
+from flask import request, jsonify, make_response, abort
 from app import app
 from app import socketio
 from app.schemas import *
@@ -17,6 +17,11 @@ def create_poll_qya_live():
     codigo = body["codigo"]
     activar = body["activar"]
     id_user = get_jwt_identity()
+    moderar = body["moderar"]
+    if moderar:
+        moderar = 1
+    else: 
+        moderar = 0
     sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
     evento = getDataOne(sql)
     if evento:
@@ -31,8 +36,8 @@ def create_poll_qya_live():
             posicion = 0+1
 
         sql = f"""
-                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, fecha) VALUES ( 5,
-                '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion,  id_user, id_evento, fecha, extra) VALUES ( 5,
+                '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}', '{moderar}' ) 
                 """
         id_tipo_encuesta = updateData(sql)
 
@@ -78,6 +83,11 @@ def guardar_pregunta_tipo_5():
     pregunta = body["pregunta"]
     id_user = get_jwt_identity()
     codigo = body["codigo"]
+    moderar = body["moderar"]
+    if moderar:
+        moderar = 1
+    else: 
+        moderar = 0
     # buscar id del evento por le codigo
     sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}' "
     # buscar por uid las encuestas q tenga en la db
@@ -103,9 +113,9 @@ def guardar_pregunta_tipo_5():
         else:
             posicion = 0+1
         sql = f"""
-                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion, id_user, id_evento, fecha) 
+                INSERT INTO mn_tipo_encuesta ( tipo, titulo, posicion, id_user, id_evento, fecha, extra) 
                 VALUES 
-                ( 5, '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}'  ) 
+                ( 5, '{pregunta}', '{posicion}', '{id_user}', '{id_evento}',  '{datetime.now()}', '{moderar}'  ) 
                 """
         id_tipo = updateData(sql)
         response = {
@@ -115,7 +125,7 @@ def guardar_pregunta_tipo_5():
     else:
         print("es vieja la actualizo")
         sql = f"""
-                update mn_tipo_encuesta set titulo = '{pregunta}', fecha = '{datetime.now()}' where 
+                update mn_tipo_encuesta set titulo = '{pregunta}', fecha = '{datetime.now()}', extra = '{moderar}' where 
                 id_evento = '{id_evento}' and id_user = '{id_user}' and id = '{id}'
                 """
         id_tipo = updateData(sql)
@@ -138,10 +148,15 @@ def add_qya_live_front():
     id_user = body["p"]
     modoLive = body["liveMode"]
     parent = body["parent"]
+    extra = body["extra"]
+    statusPregunta = 1
+    if extra == 1: 
+        statusPregunta = 0
+
 
     sql = f"""
-        INSERT INTO mn_qya_q ( texto, id_user, id_encuesta, id_evento, parent, date) VALUES ( '{pregunta}',
-        '{id_user}', '{id_encuesta}', '{id_evento}', '{parent}', '{datetime.now()}'  ) 
+        INSERT INTO mn_qya_q ( texto, id_user, id_encuesta, id_evento, parent, date, status) VALUES ( '{pregunta}',
+        '{id_user}', '{id_encuesta}', '{id_evento}', '{parent}', '{datetime.now()}', '{statusPregunta}'  ) 
         """
     id_qya = updateData(sql)
     if modoLive == 1:
@@ -173,13 +188,18 @@ def edit_qya_live_modal():
     modo = body["modo"]
     id = body["id"]
     activar = body["activar"]
+    moderar = body["moderar"]
+    if moderar:
+        moderar = 1
+    else: 
+        moderar = 0
     id_user = get_jwt_identity()
     sql = f"SELECT * FROM mn_eventos where codigo = '{codigo}' and id_user = '{id_user}'  "
     evento = getDataOne(sql)
     if evento:
         id_evento = evento[0]
         sql = f"""
-        update mn_tipo_encuesta set titulo = '{pregunta}' where 
+        update mn_tipo_encuesta set titulo = '{pregunta}', extra = '{moderar}' where 
         id = '{id}' and id_user = '{id_user}' 
         """
         tipoEncuesta = updateData(sql)
@@ -407,7 +427,7 @@ def get_preguntas_qya_front():
     tipoEncuesta = getData(sql2)
     if tipoEncuesta:
         print("buscar qya siu tiene preguntas")
-        sql3 = f"SELECT  * FROM mn_qya_q where id_encuesta = '{id_encuesta}' and id_evento = '{id_evento}' and parent = 0 order by like_count desc  "
+        sql3 = f"SELECT  * FROM mn_qya_q where id_encuesta = '{id_encuesta}' and id_evento = '{id_evento}' and parent = 0 order by destacada desc, like_count desc "
         getQyA = getData(sql3)
 
         PreguntasEncuestaQyA = []
@@ -439,7 +459,9 @@ def get_preguntas_qya_front():
                 'id_user': row[2],
                 'likes': row[6],
                 'fecha': time_passed(str(row[7])),
-                'reply': replyEncuestaQyA
+                'reply': replyEncuestaQyA,
+                'status': row[9],
+                'destacada': row[8],
             })
 
         response = {
@@ -452,3 +474,168 @@ def get_preguntas_qya_front():
         }
 
     return jsonify(response)
+
+
+# get qya front
+@app.route('/api/get_preguntas_qya_live_admin', methods=["GET"])
+def get_preguntas_qya_live_admin():
+    id_evento = request.args.get('id_evento', '')
+    id_encuesta = request.args.get('id_encuesta', '')
+    id_user = request.args.get('p', '')
+    sql2 = f"SELECT * FROM mn_tipo_encuesta where id = {id_encuesta} and id_evento = '{id_evento}'  "
+    tipoEncuesta = getDataOne(sql2)
+    if tipoEncuesta:
+        extra = tipoEncuesta[7]
+        print("buscar qya siu tiene preguntas")
+        sql3 = f"SELECT  * FROM mn_qya_q where id_encuesta = '{id_encuesta}' and id_evento = '{id_evento}' and parent = 0 order by destacada desc, like_count desc "
+        getQyA = getData(sql3)
+
+        PreguntasEncuestaQyA = []
+        arrayPreguntasModerar = []
+        for row in getQyA:
+            # buscar las respuestas a la pregunta
+            sql3 = f"SELECT  * FROM mn_qya_q where id_encuesta = '{id_encuesta}' and id_evento = '{id_evento}' and parent = '{row[0]}' order by id desc  "
+            replyQyA = getData(sql3)
+            replyEncuestaQyA = []
+            for row2 in replyQyA:
+                replyEncuestaQyA.append({
+                    'id': row2[0],
+                    'texto': row2[1],
+                    'usuario': "Moderador",
+                    'fecha': time_passed(str(row2[7]))
+                })
+
+            # buscar nomb re de uysuario
+            sql3 = f"SELECT  * FROM mn_users where id = '{row[2]}'   "
+            getUser = getDataOne(sql3)
+            if getUser:
+                nombreUsuario = getUser[1] + " " + getUser[2]
+            else:
+                nombreUsuario = "Anonimo"
+
+            if row[9] == 0:
+                
+                arrayPreguntasModerar.append({
+                'id': row[0],
+                'texto': row[1],
+                'usuario': nombreUsuario,
+                'id_user': row[2],
+                'likes': row[6],
+                'fecha': time_passed(str(row[7])),
+                'reply': replyEncuestaQyA,
+                })
+            else:
+                PreguntasEncuestaQyA.append({
+                'id': row[0],
+                'texto': row[1],
+                'usuario': nombreUsuario,
+                'id_user': row[2],
+                'likes': row[6],
+                'fecha': time_passed(str(row[7])),
+                'reply': replyEncuestaQyA,
+                'destacada': row[8]
+                })
+
+        response = {
+            'status': 1,
+            'extra': extra,
+            'preguntas': PreguntasEncuestaQyA,
+            'moderar': arrayPreguntasModerar,
+        }
+    else:
+        response = {
+            'status': 0
+        }
+
+    return jsonify(response)
+
+
+
+
+# moderar encuesta qya
+@app.route('/api/moderar_qya_pregunta_by_id', methods=['POST'])
+@jwt_required()
+def moderar_qya_pregunta_by_id():
+    body = request.get_json()
+    print(body)
+    id_pregunta = body["id"]
+    codigo = body["codigo"]
+    id_encuesta = body["id_encuesta"]
+    modoLive = body["modoLive"]
+    id_user = get_jwt_identity()
+
+    sql = f"SELECT * FROM mn_qya_q where id = '{id_pregunta}'  "
+    getQYA = getDataOne(sql)
+    if getQYA:
+        #ahora voy a asegurarme q el usuario admin sea el correcto 
+        sql = f"SELECT * FROM mn_eventos where id = '{getQYA[4]}' and id_user = '{id_user}'  "
+        getEvento = getDataOne(sql)
+        if getEvento:
+            sql = f"""
+            update  mn_qya_q set status = 1 where 
+            id = '{id_pregunta}' 
+            """
+            id_status_qya = updateData(sql)
+            response = {
+                "status": 1
+            }
+            socketio.emit('moderandoPreguntaQyA', {
+            "msj": "Moderando pregunta desde el admin", "codigo": codigo, "id_encuesta": id_encuesta, "modoLive": modoLive}, to=codigo)
+            return jsonify(response)
+        else:
+            abort(make_response(jsonify(message="data incorrect  id user"), 404))
+    else:
+        abort(make_response(jsonify(message="data incorrect id"), 404))
+
+
+
+# moderar encuesta qya
+@app.route('/api/destacar_qya_pregunta_by_id', methods=['POST'])
+@jwt_required()
+def destacar_qya_pregunta_by_id():
+    body = request.get_json()
+    print("boduy destacadasd",body)
+    id_pregunta = body["id"]
+    codigo = body["codigo"]
+    id_encuesta = body["id_encuesta"]
+    modoLive = body["modoLive"]
+    id_user = get_jwt_identity()
+
+    sql = f"SELECT * FROM mn_qya_q where id = '{id_pregunta}'  "
+    getQYA = getDataOne(sql)
+    if getQYA:
+        destacada = getQYA[8]
+        if destacada == 0:
+            destacada = 1
+        else:
+            destacada = 0
+        #ahora voy a asegurarme q el usuario admin sea el correcto 
+        sql = f"SELECT * FROM mn_eventos where id = '{getQYA[4]}' and id_user = '{id_user}'  "
+        getEvento = getDataOne(sql)
+        if getEvento:
+            sql = f"""
+            update  mn_qya_q set destacada = 0 where 
+            id_encuesta = '{id_encuesta}' 
+            """
+            noDestacar = updateData(sql)
+            sql = f"""
+            update  mn_qya_q set destacada = '{destacada}' where 
+            id = '{id_pregunta}' 
+            """
+            destacarById = updateData(sql)
+            response = {
+                "status": 1
+            }
+            socketio.emit('destacandoPreguntaQyA', {
+            "msj": "Destacando pregunta desde el admin", "codigo": codigo, "id_encuesta": id_encuesta, "modoLive": modoLive}, to=codigo)
+            return jsonify(response)
+        else:
+            abort(make_response(jsonify(message="data incorrect  id user"), 404))
+    else:
+        abort(make_response(jsonify(message="data incorrect id"), 404))
+
+        
+    
+
+    
+    

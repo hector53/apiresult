@@ -1022,6 +1022,9 @@ def get_encuestas_event():
             pregunta = en[2]
             multiple = en[7]
             premios = en[9]
+            moderar = False
+            if en[8] == 1:
+                moderar = True
 
             if tipo == 1:
                 # ahora busco las opciones
@@ -1097,7 +1100,8 @@ def get_encuestas_event():
                     'tipo': tipo,
                     'idEcuesta': idEcuesta,
                     'pregunta': pregunta,
-                    'id_evento': id_evento
+                    'id_evento': id_evento, 
+                    'moderar': moderar
                 })
 
         response = {
@@ -1360,7 +1364,8 @@ def get_encuesta_event_live():
                 'tipo': en[1],
                 'titulo': en[2],
                 'posicion': en[3],
-                'play': en[6]
+                'play': en[6], 
+                'extra': en[7]
             })
             response = {
                 "status": 1,
@@ -1400,6 +1405,7 @@ def get_encuestas_by_id_live():
             'posicion': en[3],
             'play': en[6],
             'multiple': en[7]
+            
         })
         if en[1] == 1:
             # cargar opciones
