@@ -1189,6 +1189,8 @@ def get_event_by_cod_front():
                     'tipo': en[1],
                     'titulo': en[2],
                     'posicion': en[3],
+                    'play': en[6], 
+                    'extra': en[7]
                 })
             response = {
                 "status": 1,
