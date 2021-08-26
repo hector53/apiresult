@@ -26,6 +26,7 @@ url_site = "http://localhost:5000/"
 url_site_front = "http://localhost:3000/"
 """
 
+
 #datos Host para db
 host=datos["host"]
 database=datos["database"]

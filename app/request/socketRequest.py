@@ -6,6 +6,63 @@ from app.schemas import *
 
 
 users = []
+def getUserBySid(sid):
+    status = 0
+    #buscar user si existe el usuario con el username y el room 
+    sql = f"SELECT * FROM mn_clientes_conectados where sid = '{sid}'  "
+    # buscar por uid las encuestas q tenga en la db
+    buscarUserinRoom = getDataOne(sql)
+    if buscarUserinRoom:
+        status = 1
+    return status
+
+def ingresarUser(id, id_user, room):
+    status = 0
+    #buscar user si existe el usuario con el username y el room 
+    sql = f"SELECT * FROM mn_clientes_conectados where id_user = '{id_user}' and room = '{room}' "
+    # buscar por uid las encuestas q tenga en la db
+    buscarUserinRoom = getDataOne(sql)
+
+    if buscarUserinRoom:
+        status = 1
+        #osea q ya existe el user en el room seguro esta abriendo una nueva pestaña 
+    else:
+        #no existe 
+        sql = f"""
+        INSERT INTO mn_clientes_conectados ( sid, room, id_user) VALUES
+        (  '{id}', '{room}', '{id_user}') 
+        """
+        nuevoUserRoom = updateData(sql)
+    return status
+
+
+def getCountUsersRoom(room):
+    sql = f"SELECT * FROM mn_clientes_conectados where  room = '{room}' "
+    # buscar por uid las encuestas q tenga en la db
+    buscarUsersInRoom = getData(sql)
+    return len(buscarUsersInRoom)
+
+def leaveUserRoom(sid):
+    response = {
+        "status": 0
+    }
+    #buscar user si existe el usuario con el username y el room 
+    sql = f"SELECT * FROM mn_clientes_conectados where sid = '{sid}'  "
+    # buscar por uid las encuestas q tenga en la db
+    buscarUserinRoom = getDataOne(sql)
+
+    if buscarUserinRoom:
+        response = {
+        "status": 1, 
+        "room": buscarUserinRoom[2], 
+        "username": buscarUserinRoom[3]
+        }
+        #si existe lo borro 
+        sql = f"""
+        delete from mn_clientes_conectados where sid = '{sid}'
+        """
+        deleteUserInRoom = updateData(sql)
+    return response
 
 def userJoin(id, username, room):
     global users
@@ -48,34 +105,44 @@ def connect():
 
 @socketio.on('disconnect')
 def test_disconnect():
-    global users
     print('Client disconnected', request.sid)
 
-   
+    leaveUser = leaveUserRoom(request.sid)
+    print("leave user di", leaveUser)
+    if leaveUser["status"] == 1: 
+        leave_room(leaveUser["room"])
+        conectadosRoom = getCountUsersRoom(leaveUser["room"])
+        socketio.emit('join_room_disconect', {
+        'username': leaveUser["username"], 'codigo': leaveUser["room"], 'conectados': conectadosRoom}, to=leaveUser["room"])
+        if conectadosRoom == 0:
+            close_room(leaveUser["room"])
+        return {"user": leaveUser["username"], "conectados": conectadosRoom}
+    else:
+        return 0
+
+        #lo borre 
     
-    leaveUser = userLeave(request.sid)
-    leave_room(leaveUser['user']['room'])
-    conectadosRoom = getRoomUsers(leaveUser['user']['room'])
-    socketio.emit('join_room_disconect', {
-        'username': leaveUser['user']['username'], 'codigo': leaveUser['user']['room'], 'conectados': conectadosRoom}, to=leaveUser['user']['room'])
-    if conectadosRoom == None:
-        close_room(leaveUser['user']['room'])
+    
+    
 
 
 @socketio.on('desconectar')
 def desconectarManual():
     global users
-    print('Client disconnected de forma manual', request.sid)
+    print('Client disconnected manual', request.sid)
 
-   
-    
-    leaveUser = userLeave(request.sid)
-    leave_room(leaveUser['user']['room'])
-    conectadosRoom = getRoomUsers(leaveUser['user']['room'])
-    socketio.emit('join_room_disconect', {
-        'username': leaveUser['user']['username'], 'codigo': leaveUser['user']['room'], 'conectados': conectadosRoom}, to=leaveUser['user']['room'])
-    if conectadosRoom == None:
-        close_room(leaveUser['user']['room'])
+    leaveUser = leaveUserRoom(request.sid)
+    print("leave user di", leaveUser)
+    if leaveUser["status"] == 1: 
+        leave_room(leaveUser["room"])
+        conectadosRoom = getCountUsersRoom(leaveUser["room"])
+        socketio.emit('join_room_disconect', {
+        'username': leaveUser["username"], 'codigo': leaveUser["room"], 'conectados': conectadosRoom}, to=leaveUser["room"])
+        if conectadosRoom == 0:
+            close_room(leaveUser["room"])
+        return {"user": leaveUser["username"], "conectados": conectadosRoom}
+    else:
+        return 0
     
     
     
@@ -85,10 +152,11 @@ def desconectarManual():
 @socketio.on('joinRoom')
 def joinRoom(data):
     print("id de usuario conectado", request.sid)
-    userJoin(request.sid, data['username'], data['room'])
-    conectadosRoom = getRoomUsers(data['room'])
-    join_room(data['room'])
-    # en este emit debo enviar las personas conectadas al evento
+    joinUserRoom =  ingresarUser(request.sid, data['username'], data['room'])
+    print("join user room statuys", joinUserRoom)
+    if joinUserRoom == 0:
+        join_room(data['room'])
+    conectadosRoom = getCountUsersRoom(data['room'])
     socketio.emit('join_room_announcement', {
                   'username': data['username'], 'codigo': data['room'], 'conectados': conectadosRoom}, to=data['room'])
 
@@ -103,14 +171,9 @@ def enviarReaccion(data):
 @socketio.event
 def ping(data):
     print("ping recibido del usuario: ",  data['username'])
-    usuarioActual = getCurrentUser(request.sid)
-    print("usuario actual", usuarioActual)
-    # en este emit debo enviar las personas conectadas al evento
-    conectadosRoom = getRoomUsers(data['room'])
-    print("hola room", rooms(request.sid))
-    socketio.emit('pong', {
-                  'username': data['username'], 'codigo': data['room'], 'conectados': conectadosRoom}, to=data['room'], callback=ack)
-    return 'one', 2
+    usuarioActual = getUserBySid(request.sid)
+    conectadosRoom = getCountUsersRoom(data['room'])
+    return {"user": data['username'], "ifUser": usuarioActual, "conectados": conectadosRoom}
 
 def ack(data):
     print("me llego el callback")
