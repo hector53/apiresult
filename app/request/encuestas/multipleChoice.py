@@ -205,7 +205,9 @@ def votar_encuesta():
                         '{miUid}', '{id_encuesta}', '{id_evento}', '{datetime.now()}'  ) 
                         """
             actualizar = updateData(sql)
+            print("estoy en actualiar multiple el voto ", actualizar)
             if actualizar:
+                print("estro a actualizr")
                 if modoLive == 1:
                     socketio.emit('cambioDeEncuesta', {
                                   "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)
@@ -235,7 +237,9 @@ def votar_encuesta():
                         '{miUid}', '{id_encuesta}', '{id_evento}', '{datetime.now()}'  ) 
                         """
             actualizar = updateData(sql)
+            print("estoy en actualiar el voto ", actualizar)
             if actualizar:
+                print("actualizar es mayor")
                 if modoLive == 1:
                     socketio.emit('cambioDeEncuesta', {
                                   "tipo": 1, "msj": "cambia encuesta", "codigo": codigo, "id_encuesta": id_encuesta}, to=codigo)

@@ -512,19 +512,7 @@ def get_preguntas_qya_live_admin():
                 nombreUsuario = getUser[1] + " " + getUser[2]
             else:
                 nombreUsuario = "Anonimo"
-
-            if row[9] == 0:
-                
-                arrayPreguntasModerar.append({
-                'id': row[0],
-                'texto': row[1],
-                'usuario': nombreUsuario,
-                'id_user': row[2],
-                'likes': row[6],
-                'fecha': time_passed(str(row[7])),
-                'reply': replyEncuestaQyA,
-                })
-            else:
+            if extra == 0:
                 PreguntasEncuestaQyA.append({
                 'id': row[0],
                 'texto': row[1],
@@ -535,6 +523,29 @@ def get_preguntas_qya_live_admin():
                 'reply': replyEncuestaQyA,
                 'destacada': row[8]
                 })
+            else:
+                if row[9] == 0:
+                    
+                    arrayPreguntasModerar.append({
+                    'id': row[0],
+                    'texto': row[1],
+                    'usuario': nombreUsuario,
+                    'id_user': row[2],
+                    'likes': row[6],
+                    'fecha': time_passed(str(row[7])),
+                    'reply': replyEncuestaQyA,
+                    })
+                else:
+                    PreguntasEncuestaQyA.append({
+                    'id': row[0],
+                    'texto': row[1],
+                    'usuario': nombreUsuario,
+                    'id_user': row[2],
+                    'likes': row[6],
+                    'fecha': time_passed(str(row[7])),
+                    'reply': replyEncuestaQyA,
+                    'destacada': row[8]
+                    })
 
         response = {
             'status': 1,
